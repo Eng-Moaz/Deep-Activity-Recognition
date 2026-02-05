@@ -45,8 +45,8 @@ class VolleyballSceneBase(Dataset):
                 for line in f:
                     parts = line.strip().split()  #'23613 l_spike' -> [23613,"l_spike"]
                     if len(parts) < 2: continue
-                    clip_id = parts[0]
-                    clip_label = parts[1]
+                    clip_id = parts[0].split('.')[0]  #'9575.jpg' -> '9575'
+                    clip_label = parts[1].replace('-', '_') #'l-pass' -> 'l_pass'
                     if clip_label not in self.classes_to_idx: continue
 
                     label_clip_idx = self.classes_to_idx[clip_label]  #Convert to class string to its index
