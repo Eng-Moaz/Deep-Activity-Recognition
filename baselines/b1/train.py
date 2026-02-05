@@ -1,3 +1,11 @@
+import os
+import sys
+
+current_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.abspath(os.path.join(current_dir, "../../"))
+sys.path.append(project_root)
+
+
 import torch
 import torch.optim as optim
 import yaml
@@ -68,13 +76,17 @@ def eval_epoch(model,data_loader,criterion,device):
 
 def train(cfg):
     # Prepare parameters
-    save_path = "models/b1/best_model.pth"
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     num_classes = cfg["model"]["num_classes"]
     dropout = cfg["training"]["dropout"]
     lr = cfg["training"]["learning_rate"]
     weight_decay = cfg["training"]["weight_decay"]
     epochs = cfg["training"]["epochs"]
+
+    save_dir = os.path.join(project_root, "models", "b1")
+    os.makedirs(save_dir, exist_ok=True)
+    save_path = os.path.join(save_dir, "best_model.pth")
+    print(f"Model will be saved to: {save_path}")
 
     model = Baseline1(num_classes=num_classes,
                       dropout=dropout).to(device)
