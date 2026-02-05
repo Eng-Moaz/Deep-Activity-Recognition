@@ -13,19 +13,23 @@ def train_epoch(model,data_loader,criterion,optimizer,device):
     for image,label in loader:
         #To device
         image, label = image.to(device), label.to(device)
+
         #Model training
         output = model(image)
         loss = criterion(output,label)
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
+
         #accumilating losses and correct predictions
         _, predicted = torch.max(output.data,1)
         correct += (predicted == label).sum().item()
         total += label.size(0)
         total_loss += loss.item()
+
         #tqdm utility
         loader.set_postfix(loss=loss.item(), acc=100. * correct / total)
+
     #accuracy and loss per epoch calculation
     acc_epoch = 100 * correct / total
     loss_epoch = total_loss / len(data_loader)
@@ -41,14 +45,17 @@ def eval_epoch(model,data_loader,criterion,device):
         for image, label in data_loader:
             # To device
             image, label = image.to(device), label.to(device)
+
             #Predictions
             output = model(image)
             loss = criterion(output, label)
+
             #accumilating losses and correct predictions
             _, predicted = torch.max(output.data, 1)
             correct += (predicted == label).sum().item()
             total += label.size(0)
             total_loss += loss.item()
+
         # accuracy and loss per epoch calculation
         acc_epoch = 100 * correct / total
         loss_epoch = total_loss / len(data_loader)
@@ -71,4 +78,3 @@ def train(cfg):
         val_loss, val_acc = eval_epoch(model, val_loader, criterion, device)
         print(f"Epoch {epoch+1} ----> Train loss: {train_loss} | Train acc: {train_acc}")
         print(f"Epoch {epoch+1} ----> Val loss: {val_loss} | Val acc: {val_acc}")
-
