@@ -18,3 +18,4 @@ training:
   dropout: 0.6
   optimizer: "AdamW"
   weight_decay: 0.0001
+  epochs: 15
