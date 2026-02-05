@@ -53,20 +53,27 @@ class VolleyballSceneBase(Dataset):
                     clip_path = os.path.join(vid_path,clip_id)
                     if not os.path.isdir(clip_path): continue
 
-                    #Retrieves the frames sorted in a list
-                    frames = sorted([
+                    #Retrieve the frames sorted in a list
+                    all_frames = sorted([
                         os.path.join(clip_path, f)
                         for f in os.listdir(clip_path)
                         if f.endswith('.jpg')
                     ], key=lambda x: int(os.path.basename(x).split('.')[0]))
 
-                    #Finally append the whole information to the samples list
-                    samples.append({
-                        "video_id": vid_id,
-                        "clip_id": clip_id,
-                        "clip_label": label_clip_idx,
-                        "frames": frames
-                    })
+                    #Take the middle 9 frames
+                    mid_idx = len(all_frames) // 2
+                    start_idx = max(0, mid_idx - 4)
+                    end_idx = min(len(all_frames), mid_idx + 5)
+                    window_frames = all_frames[start_idx:end_idx]
+
+                    #Append each in samples list
+                    for frame_path in window_frames:
+                        samples.append({
+                            "image_path": frame_path,
+                            "label": label_clip_idx,
+                            "video_id": vid_id,
+                            "clip_id": clip_id
+                        })
 
         return samples
 
@@ -77,18 +84,14 @@ class SpatialScene(VolleyballSceneBase):
 
     def __getitem__(self, idx):
         sample = self.samples[idx]
-        frames = sample["frames"]
+        image_path = sample["image_path"]
+        label = sample["label"]
 
-        if self.split == "train":
-            frame_path = random.choice(frames)
-        else:
-            frame_path = frames[len(frames)//2]
-
-        img = Image.open(frame_path).convert("RGB")
+        img = Image.open(image_path).convert("RGB")
         if self.transform:
             img = self.transform(img)
 
-        return img , sample["clip_label"]
+        return img , label
 
 class TemporalScene(VolleyballSceneBase):
     pass

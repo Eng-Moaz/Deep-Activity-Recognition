@@ -112,7 +112,8 @@ def train(cfg):
 
     #Evaluate on test set
     model.load_state_dict(torch.load(save_path))
-    evaluate_test_set(model, test_loader, device, cfg["model"]["class_names"])
+    cm_save_path = os.path.join(save_dir, "confusion_matrix.png")
+    evaluate_test_set(model, test_loader, device, cfg["model"]["class_names"],cm_save_path)
 
 if __name__ == "__main__":
     with open("config.yaml", "r") as f:
