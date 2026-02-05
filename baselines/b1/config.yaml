@@ -1,5 +1,16 @@
+experiment_name: "baseline1_spatial"
+
+data:
+  root: "/kaggle/input/volleyball/volleyball_"
+
 model:
   num_classes: 8
+  class_names: [
+  'l_pass', 'r_pass',
+  'l_spike', 'r_spike',
+  'l_set', 'r_set',
+  'l_winpoint', 'r_winpoint'
+  ]
 
 training:
   batch_size: 256
