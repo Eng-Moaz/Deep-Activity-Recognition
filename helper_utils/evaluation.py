@@ -37,14 +37,12 @@ def evaluate_test_set(model, data_loader, device, classes,save_path=None):
     plt.ylabel('True Label')
     plt.title('Confusion Matrix - Baseline 1 (Spatial)')
     plt.tight_layout()
-    plt.show()
 
     if save_path:
         plt.savefig(save_path)
         print(f"Confusion Matrix saved to: {save_path}")
-    else:
-        plt.show()
 
+    plt.show()
     plt.close()
 
     accuracy = np.mean(np.array(y_true) == np.array(y_pred))

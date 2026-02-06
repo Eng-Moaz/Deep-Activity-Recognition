@@ -1,0 +1,34 @@
+system:
+  device: "cuda"
+  num_workers: 4
+
+training:
+  epochs: 30
+  batch_size: 8
+  learning_rate: 0.0005
+  weight_decay: 0.0001
+
+model:
+  num_classes: 8
+  hidden_size: 512
+  lstm_layers: 1
+  dropout: 0.5
+  class_names: [
+    'l_pass', 'r_pass',
+    'l_spike', 'r_spike',
+    'l_set', 'r_set',
+    'l_winpoint', 'r_winpoint'
+  ]
+
+scheduler:
+  use_scheduler: True
+  step_size: 10
+  gamma: 0.1
+
+data:
+  root: "/kaggle/input/volleyball/volleyball_"
+
+paths:
+  trained_resnet: "/kaggle/working/Deep-Activity-Recognition/models/b1/best_model.pth"
+  model_save_path: "best_model_b4.pth"
+  cm_save_path: "confusion_matrix_b4.png"
