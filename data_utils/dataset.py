@@ -1,6 +1,7 @@
 import os
-import random
 from typing import List, Dict, Any
+
+import torch
 from PIL import Image
 from torch.utils.data import Dataset
 
@@ -27,12 +28,9 @@ class VolleyballSceneBase(Dataset):
         #Define and enumerate classes
         self.classes = ['l_pass', 'r_pass', 'l_spike', 'r_spike', 'l_set', 'r_set', 'l_winpoint', 'r_winpoint']
         self.classes_to_idx = {cls: i for i,cls in enumerate(self.classes)}
-        self.samples: List[Dict[str, Any]] = self._load_annotations()
 
-    def __len__(self):
-        return len(self.samples)
 
-    def _load_annotations(self):
+    def _load_annotations(self,mode):
         samples = []
         for vid_id in self.video_ids:
             #video path etc videos/1 and its annotation file
@@ -49,7 +47,7 @@ class VolleyballSceneBase(Dataset):
                     clip_label = parts[1].replace('-', '_') #'l-pass' -> 'l_pass'
                     if clip_label not in self.classes_to_idx: continue
 
-                    label_clip_idx = self.classes_to_idx[clip_label]  #Convert to class string to its index
+                    label_clip_idx = self.classes_to_idx[clip_label]  #Converts a class string to its index
                     clip_path = os.path.join(vid_path,clip_id)
                     if not os.path.isdir(clip_path): continue
 
@@ -66,21 +64,30 @@ class VolleyballSceneBase(Dataset):
                     end_idx = min(len(all_frames), mid_idx + 5)
                     window_frames = all_frames[start_idx:end_idx]
 
-                    #Append each in samples list
-                    for frame_path in window_frames:
+                    if mode == "spatial":
+                        # Append each in samples list
+                        for frame_path in window_frames:
+                            samples.append({
+                                "image_path": frame_path,
+                                "label": label_clip_idx,
+                                "video_id": vid_id,
+                                "clip_id": clip_id
+                            })
+                    elif mode == "temporal":
+                        #Append all at once as a list to samples
                         samples.append({
-                            "image_path": frame_path,
+                            "sequence": window_frames,
                             "label": label_clip_idx,
                             "video_id": vid_id,
                             "clip_id": clip_id
                         })
-
         return samples
 
 class SpatialScene(VolleyballSceneBase):
     def __init__(self,root_dir,split,transform=None):
         super().__init__(root_dir, split)
         self.transform = transform
+        self.samples: List[Dict[str, Any]] = self._load_annotations("spatial")
 
     def __getitem__(self, idx):
         sample = self.samples[idx]
@@ -92,6 +99,28 @@ class SpatialScene(VolleyballSceneBase):
             img = self.transform(img)
 
         return img , label
+    def __len__(self):
+        return len(self.samples)
 
 class TemporalScene(VolleyballSceneBase):
-    pass
+    def __init__(self,root_dir,split,transform=None):
+        super().__init__(root_dir, split)
+        self.transform = transform
+        self.samples: List[Dict[str, Any]] = self._load_annotations("temporal")
+
+    def __len__(self):
+        return len(self.samples)
+
+    def __getitem__(self, idx):
+        sample = self.samples[idx]
+        sequence = sample["sequence"]
+        label = sample["label"]
+        imgs = []
+        for photo_path in sequence:
+            img = Image.open(photo_path).convert("RGB")
+            if self.transform:
+                img = self.transform(img)
+            imgs.append(img)
+        imgs = torch.stack(imgs)
+
+        return imgs , label
