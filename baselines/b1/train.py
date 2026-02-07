@@ -1,121 +1,128 @@
 import os
 import sys
-
-current_dir = os.path.dirname(os.path.abspath(__file__))
-project_root = os.path.abspath(os.path.join(current_dir, "../../"))
-sys.path.append(project_root)
-
-
-import torch
-import torch.optim as optim
 import yaml
-from tqdm import tqdm
-from model import Baseline1
+import torch
 import torch.nn as nn
-from data_utils.dataloader import get_data_loaders
-from helper_utils.evaluation import  evaluate_test_set
+import torch.optim as optim
+from tqdm import tqdm
 
-def train_epoch(model,data_loader,criterion,optimizer,device):
+# Ensure project root is in path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+
+from model import Baseline1
+from data_utils.dataloader import get_data_loaders
+from helper_utils.evaluation import evaluate_test_set
+
+
+def load_config(config_path="config.yaml"):
+    with open(config_path, 'r') as file:
+        return yaml.safe_load(file)
+
+
+def train_one_epoch(model, loader, criterion, optimizer, device):
     model.train()
-    total_loss = 0.0
+    running_loss = 0.0
     correct = 0
     total = 0
-    loader = tqdm(data_loader,desc="")
-    for image,label in loader:
-        #To device
-        image, label = image.to(device), label.to(device)
 
-        #Model training
-        output = model(image)
-        loss = criterion(output,label)
+    loop = tqdm(loader, desc="Training", leave=False)
+    for images, labels in loop:
+        images, labels = images.to(device), labels.to(device)
+
+        # Forward
+        outputs = model(images)
+        loss = criterion(outputs, labels)
+
+        # Backward
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
 
-        #accumulating losses and correct predictions
-        _, predicted = torch.max(output.data,1)
-        correct += (predicted == label).sum().item()
-        total += label.size(0)
-        total_loss += loss.item()
+        # Stats
+        running_loss += loss.item()
+        _, predicted = torch.max(outputs, 1)
+        total += labels.size(0)
+        correct += (predicted == labels).sum().item()
+        loop.set_postfix(loss=loss.item())
 
-        #tqdm utility
-        loader.set_postfix(loss=loss.item(), acc=100. * correct / total)
+    epoch_loss = running_loss / len(loader)
+    epoch_acc = 100. * correct / total
+    return epoch_loss, epoch_acc
 
-    #accuracy and loss per epoch calculation
-    acc_epoch = 100 * correct / total
-    loss_epoch = total_loss / len(data_loader)
 
-    return loss_epoch , acc_epoch
-
-def eval_epoch(model,data_loader,criterion,device):
+def validate(model, loader, criterion, device):
     model.eval()
-    total_loss = 0.0
+    running_loss = 0.0
     correct = 0
     total = 0
+
     with torch.no_grad():
-        for image, label in data_loader:
-            # To device
-            image, label = image.to(device), label.to(device)
+        for images, labels in loader:
+            images, labels = images.to(device), labels.to(device)
 
-            #Predictions
-            output = model(image)
-            loss = criterion(output, label)
+            outputs = model(images)
+            loss = criterion(outputs, labels)
 
-            #accumilating losses and correct predictions
-            _, predicted = torch.max(output.data, 1)
-            correct += (predicted == label).sum().item()
-            total += label.size(0)
-            total_loss += loss.item()
+            running_loss += loss.item()
+            _, predicted = torch.max(outputs, 1)
+            total += labels.size(0)
+            correct += (predicted == labels).sum().item()
 
-        # accuracy and loss per epoch calculation
-        acc_epoch = 100 * correct / total
-        loss_epoch = total_loss / len(data_loader)
-
-    return loss_epoch, acc_epoch
+    epoch_loss = running_loss / len(loader)
+    epoch_acc = 100. * correct / total
+    return epoch_loss, epoch_acc
 
 
-def train(cfg):
-    # Prepare parameters
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    num_classes = cfg["model"]["num_classes"]
-    dropout = cfg["training"]["dropout"]
-    lr = cfg["training"]["learning_rate"]
-    weight_decay = cfg["training"]["weight_decay"]
-    epochs = cfg["training"]["epochs"]
+def train():
+    # Setup
+    cfg = load_config("config.yaml")
+    device = torch.device(cfg['system'].get('device', 'cuda' if torch.cuda.is_available() else 'cpu'))
+    print(f"Device: {device}")
 
-    save_dir = os.path.join(project_root, "models", "b1")
-    os.makedirs(save_dir, exist_ok=True)
-    save_path = os.path.join(save_dir, "best_model.pth")
-    print(f"Model will be saved to: {save_path}")
+    # Data
+    train_loader, val_loader, test_loader = get_data_loaders(cfg, mode="spatial")
+    print(f"Train Batches: {len(train_loader)} | Val Batches: {len(val_loader)}")
 
-    model = Baseline1(num_classes=num_classes,
-                      dropout=dropout).to(device)
-    optimizer = optim.AdamW(model.parameters(),
-                            lr=lr,
-                            weight_decay=weight_decay)
+    # Model & Optimizer
+    model = Baseline1(
+        num_classes=cfg["model"]["num_classes"],
+        dropout=cfg["training"]["dropout"]
+    ).to(device)
+
+    optimizer = optim.AdamW(
+        model.parameters(),
+        lr=cfg["training"]["learning_rate"],
+        weight_decay=cfg["training"]["weight_decay"]
+    )
     criterion = nn.CrossEntropyLoss()
 
-    # Retrieve data
-    train_loader, val_loader, test_loader = get_data_loaders(cfg, "spatial")
-
+    # Training Loop
     best_acc = 0.0
+    epochs = cfg["training"]["epochs"]
+
     for epoch in range(epochs):
-        train_loss, train_acc = train_epoch(model, train_loader, criterion, optimizer, device)
-        val_loss, val_acc = eval_epoch(model, val_loader, criterion, device)
-        print(f"Epoch {epoch + 1} ----> Train loss: {train_loss} | Train acc: {train_acc}")
-        print(f"Epoch {epoch + 1} ----> Val loss: {val_loss} | Val acc: {val_acc}")
+        print(f"\nEpoch {epoch + 1}/{epochs}")
+
+        train_loss, train_acc = train_one_epoch(model, train_loader, criterion, optimizer, device)
+        val_loss, val_acc = validate(model, val_loader, criterion, device)
+
+        print(f"    Train Loss: {train_loss:.4f} | Acc: {train_acc:.2f}%")
+        print(f"    Val Loss:   {val_loss:.4f} | Acc: {val_acc:.2f}%")
 
         if val_acc > best_acc:
             best_acc = val_acc
-            torch.save(model.state_dict(), save_path)
-            print(f"Saved Best Model ({best_acc:.2f}%)")
+            torch.save(model.state_dict(), cfg['paths']['model_save_path'])
+            print(f"    Saved Best Model ({best_acc:.2f}%)")
 
-    #Evaluate on test set
-    model.load_state_dict(torch.load(save_path))
-    cm_save_path = os.path.join(save_dir, "confusion_matrix.png")
-    evaluate_test_set(model, test_loader, device, cfg["model"]["class_names"],cm_save_path)
+    # Final Evaluation
+    print("\nEvaluating Best Model on Test Set...")
+    model.load_state_dict(torch.load(cfg['paths']['model_save_path'], map_location=device))
+    test_acc = evaluate_test_set(
+        model, test_loader, device,
+        cfg["model"]["class_names"], cfg['paths']['cm_save_path']
+    )
+    print(f"FINAL TEST ACCURACY: {test_acc * 100:.2f}%")
+
 
 if __name__ == "__main__":
-    with open("config.yaml", "r") as f:
-        cfg = yaml.safe_load(f)
-    train(cfg)
+    train()

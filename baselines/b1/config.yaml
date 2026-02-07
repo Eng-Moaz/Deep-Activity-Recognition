@@ -19,3 +19,7 @@ training:
   optimizer: "AdamW"
   weight_decay: 0.0001
   epochs: 15
+
+path:
+  model_save_path: "models/b1/best_model.pth"
+  cm_save_path: "models/b1/confusion_matrix.png"

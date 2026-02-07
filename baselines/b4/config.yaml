@@ -1,16 +1,18 @@
+experiment_name: "baseline4_temporal"
+
 system:
   device: "cuda"
   num_workers: 4
 
 training:
-  epochs: 30
+  epochs: 12
   batch_size: 8
-  learning_rate: 0.0005
-  weight_decay: 0.0001
+  learning_rate: 0.0001
+  weight_decay: 0.001
 
 model:
   num_classes: 8
-  hidden_size: 512
+  hidden_size: 256
   lstm_layers: 1
   dropout: 0.5
   class_names: [
@@ -30,5 +32,5 @@ data:
 
 paths:
   trained_resnet: "/kaggle/working/Deep-Activity-Recognition/models/b1/best_model.pth"
-  model_save_path: "best_model_b4.pth"
-  cm_save_path: "confusion_matrix_b4.png"
+  model_save_path: "models/b4/best_model_b4.pth"
+  cm_save_path: "models/b4/confusion_matrix_b4.png"

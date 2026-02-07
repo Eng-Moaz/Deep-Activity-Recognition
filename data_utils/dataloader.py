@@ -23,7 +23,6 @@ def get_transforms(split):
             T.Normalize(mean, std)
         ])
 
-
 def get_data_loaders(cfg, mode):
     root = cfg["data"]["root"]
     batch_size = cfg["training"]["batch_size"]
