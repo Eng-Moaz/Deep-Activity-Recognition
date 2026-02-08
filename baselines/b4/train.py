@@ -1,6 +1,5 @@
 import os
 import sys
-import yaml
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -10,14 +9,10 @@ from tqdm import tqdm
 # Ensure project root is in path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
+from config import Config
 from model import Baseline4
 from data_utils.dataloader import get_data_loaders
 from helper_utils.evaluation import evaluate_test_set
-
-
-def load_config(config_path="config.yaml"):
-    with open(config_path, 'r') as file:
-        return yaml.safe_load(file)
 
 
 def train_one_epoch(model, loader, criterion, optimizer, device):
@@ -76,46 +71,53 @@ def validate(model, loader, criterion, device):
 
 
 def train():
-    # Setup
-    cfg = load_config("config.yaml")
-    device = torch.device(cfg['system'].get('device', 'cuda' if torch.cuda.is_available() else 'cpu'))
-    print(f"Device: {device}")
+    # Instantiate Config
+    cfg = Config()
 
-    # Data
-    train_loader, val_loader, test_loader = get_data_loaders(cfg, mode="temporal")
+    # Setup Device
+    device = torch.device(cfg.device if torch.cuda.is_available() else 'cpu')
+    print(f"Device: {device}")
+    print(f"Experiment: {cfg.experiment_name}")
+
+    # Data Loaders
+    train_loader, val_loader, test_loader = get_data_loaders(cfg)
     print(f"Train Batches: {len(train_loader)} | Val Batches: {len(val_loader)}")
 
-    # Model & Optimizer
-    print(f"Loading Backbone from: {cfg['paths']['trained_resnet']}")
+    # Model Setup
+    print(f"Loading Backbone from: {cfg.trained_resnet_path}")
     model = Baseline4(
-        trained_resnet_path=cfg['paths']['trained_resnet'],
-        hidden_size=cfg['model']['hidden_size'],
-        lstm_layers=cfg['model']['lstm_layers'],
-        num_classes=cfg['model']['num_classes']
+        trained_resnet_path=cfg.trained_resnet_path,
+        hidden_size=cfg.hidden_size,
+        lstm_layers=cfg.lstm_layers,
+        num_classes=cfg.num_classes
     ).to(device)
 
-    optimizer = optim.Adam(
+    # Optimizer
+    optimizer = optim.AdamW(
         model.parameters(),
-        lr=cfg['training']['learning_rate'],
-        weight_decay=cfg['training']['weight_decay']
+        lr=cfg.learning_rate,
+        weight_decay=cfg.weight_decay
     )
 
+    # Scheduler
     scheduler = None
-    if cfg['scheduler']['use_scheduler']:
+    if cfg.use_scheduler:
         scheduler = StepLR(
             optimizer,
-            step_size=cfg['scheduler']['step_size'],
-            gamma=cfg['scheduler']['gamma']
+            step_size=cfg.step_size,
+            gamma=cfg.gamma
         )
 
     criterion = nn.CrossEntropyLoss()
 
     # Training Loop
     best_acc = 0.0
-    epochs = cfg['training']['epochs']
 
-    for epoch in range(epochs):
-        print(f"\nEpoch {epoch + 1}/{epochs}")
+    # Create save directory
+    os.makedirs(os.path.dirname(cfg.model_save_path), exist_ok=True)
+
+    for epoch in range(cfg.epochs):
+        print(f"\nEpoch {epoch + 1}/{cfg.epochs}")
 
         train_loss, train_acc = train_one_epoch(model, train_loader, criterion, optimizer, device)
         val_loss, val_acc = validate(model, val_loader, criterion, device)
@@ -123,9 +125,10 @@ def train():
         print(f"    Train Loss: {train_loss:.4f} | Acc: {train_acc:.2f}%")
         print(f"    Val Loss:   {val_loss:.4f} | Acc: {val_acc:.2f}%")
 
+        # Save Best Model
         if val_acc > best_acc:
             best_acc = val_acc
-            torch.save(model.state_dict(), cfg['paths']['model_save_path'])
+            torch.save(model.state_dict(), cfg.model_save_path)
             print(f"    Saved Best Model ({best_acc:.2f}%)")
 
         if scheduler:
@@ -133,10 +136,14 @@ def train():
 
     # Final Evaluation
     print("\nEvaluating Best Model on Test Set...")
-    model.load_state_dict(torch.load(cfg['paths']['model_save_path'], map_location=device))
+    model.load_state_dict(torch.load(cfg.model_save_path, map_location=device))
+
     test_acc = evaluate_test_set(
-        model, test_loader, device,
-        cfg["model"]["class_names"], cfg['paths']['cm_save_path']
+        model,
+        test_loader,
+        device,
+        cfg.class_names,
+        cfg.cm_save_path
     )
     print(f"FINAL TEST ACCURACY: {test_acc * 100:.2f}%")
 

@@ -30,19 +30,22 @@ class Baseline4(nn.Module):
         # Last fc Layer
         self.fc = nn.Linear(hidden_size, num_classes)
 
-    def forward(self,x):
+    def forward(self, x):
         # Merge batch_size and seq_length
-        batch_size , sequence_length , ch , h, w = x.size()
-        spatial_input = x.view(batch_size*sequence_length,ch,h,w)  # (8, 9, 3, 224, 224) -> (72, 3, 224, 224)
+        batch_size, sequence_length, ch, h, w = x.shape
+        spatial_input = x.view(batch_size * sequence_length, ch, h, w)  # (B, 9, 3, 224, 224) -> (B*9, 3, 224, 224)
 
-        #Backbone forward
+        # Backbone forward
         features = self.backbone(spatial_input)
-        features = features.view(features.size(0), -1)  # (72 x 2048 x 1 x 1) -> (72 x 2048)
-        temporal_in = features.view(batch_size,sequence_length,-1) # (72 x 2048) -> (8 x 9 x 2048)
+        features = features.flatten(1)  # (B*9 x 2048 x 1 x 1) -> (72 x 2048)
+
+        # Reshape for LSTM
+        temporal_in = features.view(batch_size, sequence_length, -1)  # (B*9 x 2048) -> (B x 9 x 2048)
 
         # LSTM forward
-        temporal_out , _ = self.lstm(temporal_in)
-        final_temporal = temporal_out[:, -1, :] # Final hidden
+        temporal_out, _ = self.lstm(temporal_in)
+        final_temporal = temporal_out[:, -1, :]  # Take the last time step
+
         final_out = self.fc(final_temporal)
 
         return final_out

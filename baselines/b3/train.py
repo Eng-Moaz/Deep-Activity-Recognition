@@ -4,12 +4,13 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from tqdm import tqdm
+import argparse
 
 # Ensure project root is in path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-from config import Config
-from model import Baseline1
+from config import Config_stg1 , Config_stg2
+from model import Baseline3_stg1 , Baseline3_stg2
 from data_utils.dataloader import get_data_loaders
 from helper_utils.evaluation import evaluate_test_set
 
@@ -73,9 +74,9 @@ def validate(model, loader, criterion, device):
     return epoch_loss, epoch_acc
 
 
-def train():
+def train_stg(stage):
     # Instantiate Config
-    cfg = Config()
+    cfg = Config_stg1() if stage == 1 else Config_stg2()
 
     # Setup Device
     device = torch.device(cfg.device if torch.cuda.is_available() else 'cpu')
@@ -88,10 +89,17 @@ def train():
     print(f"Train Batches: {len(train_loader)} | Val Batches: {len(val_loader)}")
 
     # Model Setup
-    model = Baseline1(
-        num_classes=cfg.num_classes,
-        dropout=cfg.dropout
-    ).to(device)
+    if stage == 1:
+        model = Baseline3_stg1(
+            num_classes=cfg.num_classes,
+            dropout=cfg.dropout
+        ).to(device)
+    else:
+        # Stage 2 requires loading the saved weights from Stage 1
+        model = Baseline3_stg2(
+            saved_resnet_path=cfg.saved_resnet50_path,
+            num_classes=cfg.num_classes
+        ).to(device)
 
     # Optimizer
     optimizer = optim.AdamW(
@@ -137,4 +145,12 @@ def train():
 
 
 if __name__ == "__main__":
-    train()
+    parser = argparse.ArgumentParser(description="Train Baseline 3 Stages")
+
+    # Add argument for stage (1 or 2)
+    parser.add_argument("--stage", type=int, default=1, choices=[1, 2], help="Which stage to train: 1 for Player Actions, 2 for Scene Class")
+
+    args = parser.parse_args()
+
+    # Pass the argument to your function
+    train_stg(args.stage)

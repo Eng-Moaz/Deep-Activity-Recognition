@@ -1,126 +1,309 @@
 import os
-from typing import List, Dict, Any
-
 import torch
-from PIL import Image
 from torch.utils.data import Dataset
+from PIL import Image
 
-class VolleyballSceneBase(Dataset):
-    def __init__(self,rootdir,split):
-        # Main directories
-        self.rootdir = rootdir
+
+class VolleyballSceneDataset(Dataset):
+    def __init__(self, root_dir, split, mode="scenecrops", transform=None, seq_len=9):
+
+        self.root_dir = root_dir
         self.split = split
-        self.videos_dir = os.path.join(rootdir,"videos")
+        self.mode = mode
+        self.transform = transform
+        self.max_players = 12
+        self.seq_len = seq_len
+
+        self.videos_dir = os.path.join(root_dir, "videos")
 
         # Splits
-        self.train_ids = [1, 3, 6, 7, 10, 13, 16, 18, 22, 23, 31, 32, 36, 38, 39, 40, 41, 42, 48, 50, 52, 53, 54]
-        self.val_ids = [0, 2, 8, 12, 17, 19, 24, 26, 27, 28, 30, 33, 46, 49, 51]
-        self.test_ids = [4, 5, 9, 11, 14, 15, 20, 21, 25, 29, 34, 35, 37, 43, 44, 45, 47]
+        self.split_ids = {
+            'train': [1, 3, 6, 7, 10, 13, 16, 18, 22, 23, 31, 32, 36, 38, 39, 40, 41, 42, 48, 50, 52, 53, 54],
+            'val': [0, 2, 8, 12, 17, 19, 24, 26, 27, 28, 30, 33, 46, 49, 51],
+            'test': [4, 5, 9, 11, 14, 15, 20, 21, 25, 29, 34, 35, 37, 43, 44, 45, 47]
+        }
 
-        # Pick a split
-        if self.split == "train":
-            self.video_ids = self.train_ids
-        elif self.split == "val":
-            self.video_ids = self.val_ids
-        else:
-            self.video_ids = self.test_ids
+        # Scene Labels (8 Classes)
+        self.scene_classes = ['l-pass', 'r-pass', 'l-spike', 'r-spike',
+                              'l-set', 'r-set', 'l-winpoint', 'r-winpoint']
+        self.scene_to_idx = {cls: i for i, cls in enumerate(self.scene_classes)}
 
-        # Define and enumerate classes
-        self.classes = ['l_pass', 'r_pass', 'l_spike', 'r_spike', 'l_set', 'r_set', 'l_winpoint', 'r_winpoint']
-        self.classes_to_idx = {cls: i for i,cls in enumerate(self.classes)}
+        # Action Labels (9 Classes)
+        self.action_classes = ['blocking', 'digging', 'falling', 'jumping',
+                               'moving', 'setting', 'spiking', 'standing', 'waiting']
+        self.action_to_idx = {cls: i for i, cls in enumerate(self.action_classes)}
 
+        self.samples = self._load_data()
+        print(f"[{split.upper()}] Loaded {len(self.samples)} samples (Mode: {mode})")
 
-    def _load_annotations(self,mode):
+    def _load_data(self):
         samples = []
-        for vid_id in self.video_ids:
-            # Video path etc videos/1 and its annotation file
-            vid_path = os.path.join(self.videos_dir,str(vid_id))
-            annot_file = os.path.join(vid_path,'annotations.txt')
+        target_vids = self.split_ids[self.split]
+
+        for vid_id in target_vids:
+            vid_path = os.path.join(self.videos_dir, str(vid_id))
+            if not os.path.isdir(vid_path): continue
+
+            annot_file = os.path.join(vid_path, 'annotations.txt')
             if not os.path.exists(annot_file): continue
 
-            # Open its annotation file
-            with open(annot_file,"r") as f:
+            with open(annot_file, "r") as f:
                 for line in f:
-                    parts = line.strip().split()  #'23613 l_spike' -> [23613,"l_spike"]
+                    parts = line.strip().split()
                     if len(parts) < 2: continue
-                    clip_id = parts[0].split('.')[0]  #'9575.jpg' -> '9575'
-                    clip_label = parts[1].replace('-', '_') #'l-pass' -> 'l_pass'
-                    if clip_label not in self.classes_to_idx: continue
 
-                    label_clip_idx = self.classes_to_idx[clip_label]  # Converts a class string to its index
-                    clip_path = os.path.join(vid_path,clip_id)
-                    if not os.path.isdir(clip_path): continue
+                    filename = parts[0]
+                    img_path = os.path.join(vid_path, filename)
 
-                    # Retrieve the frames sorted in a list
-                    all_frames = sorted([
-                        os.path.join(clip_path, f)
-                        for f in os.listdir(clip_path)
-                        if f.endswith('.jpg')
-                    ], key=lambda x: int(os.path.basename(x).split('.')[0]))
+                    # Scene Label
+                    scene_label_str = parts[1]
+                    if scene_label_str not in self.scene_to_idx: continue
+                    scene_label = self.scene_to_idx[scene_label_str]
 
-                    # Take the middle 9 frames
-                    mid_idx = len(all_frames) // 2
-                    start_idx = max(0, mid_idx - 4)
-                    end_idx = min(len(all_frames), mid_idx + 5)
-                    window_frames = all_frames[start_idx:end_idx]
+                    # Parse Players (x, y, w, h, action)
+                    raw_data = parts[2:]
+                    player_data = []
 
-                    if mode == "spatial":
-                        # Append each in samples list
-                        for frame_path in window_frames:
-                            samples.append({
-                                "image_path": frame_path,
-                                "label": label_clip_idx,
-                                "video_id": vid_id,
-                                "clip_id": clip_id
+                    for i in range(0, len(raw_data), 5):
+                        try:
+                            # Coordinates
+                            x, y, w, h = int(raw_data[i]), int(raw_data[i + 1]), int(raw_data[i + 2]), int(raw_data[i + 3])
+                            # Action Label
+                            action_str = raw_data[i + 4]
+                            if action_str not in self.action_to_idx: continue
+                            action_label = self.action_to_idx[action_str]
+
+                            box = (x, y, x + w, y + h)  # X1 Y1 X2 Y2
+                            player_data.append({
+                                'box': box,
+                                'action_label': action_label
                             })
-                    elif mode == "temporal":
-                        # Append all at once as a list to samples
+                        except:
+                            pass
+
+                    # Action Training (Single Player)
+                    if self.mode == "action_train":
+                        for p in player_data:
+                            samples.append({
+                                'img_path': img_path,
+                                'box': p['box'],
+                                'label': p['action_label']
+                            })
+
+                    # Scene Inference (Group players)
+                    elif self.mode == "scenecrops":
                         samples.append({
-                            "sequence": window_frames,
-                            "label": label_clip_idx,
-                            "video_id": vid_id,
-                            "clip_id": clip_id
+                            'img_path': img_path,
+                            'players': player_data,
+                            'label': scene_label
                         })
+
+                    # Full Image
+                    elif self.mode == "scenefull":
+                        samples.append({
+                            'img_path': img_path,
+                            'label': scene_label
+                        })
+
+                    # Temporal Sequence (Full Image)
+                    elif self.mode == "temporal":
+                        # We have the middle frame (10535.jpg)
+                        # We need to calculate neighbors: 10531...10539
+                        try:
+                            fid = int(filename.split('.')[0])  # 10535
+
+                            # Calculate window range
+                            half_window = self.seq_len // 2
+                            start_fid = fid - half_window
+                            end_fid = fid + half_window + 1  # +1 for range
+
+                            frames = []
+                            for i in range(start_fid, end_fid):
+                                # Reconstruct path: videos/1/10531.jpg
+                                frame_name = f"{i}.jpg"
+                                frame_path = os.path.join(vid_path, frame_name)
+                                frames.append(frame_path)
+
+                            samples.append({
+                                'frames': frames,  # List of seq_length (9) paths
+                                'label': scene_label
+                            })
+                        except:
+                            continue
+
         return samples
 
-class SpatialScene(VolleyballSceneBase):
-    def __init__(self,root_dir,split,transform=None):
-        super().__init__(root_dir, split)
-        self.transform = transform
-        self.samples: List[Dict[str, Any]] = self._load_annotations("spatial")
-
     def __getitem__(self, idx):
         sample = self.samples[idx]
-        image_path = sample["image_path"]
-        label = sample["label"]
+        # Action Training (1 Player and its action label)
+        if self.mode == "action_train":
+            img = Image.open(sample['img_path']).convert("RGB")
+            crop = img.crop(sample['box'])
+            if self.transform: crop = self.transform(crop)
+            return crop, sample['label']  # Shape: [3, 224, 224]
 
-        img = Image.open(image_path).convert("RGB")
-        if self.transform:
-            img = self.transform(img)
+        # Scene Inference (Stack of 12 Players and the scene label)
+        elif self.mode == "scenecrops":
+            img = Image.open(sample['img_path']).convert("RGB")
+            crops = []
+            for p in sample['players']:
+                c = img.crop(p['box'])
+                if self.transform: c = self.transform(c)
+                crops.append(c)
 
-        return img , label
+            # Pad/Truncate to max_players (12)
+            while len(crops) < self.max_players: crops.append(torch.zeros(3, 224, 224))
+            return torch.stack(crops[:self.max_players]), sample['label']  # Shape: [12, 3, 224, 224]
+
+        # Full Image
+        elif self.mode == "scenefull":
+            img = Image.open(sample['img_path']).convert("RGB")
+            if self.transform: img = self.transform(img)
+            return img, sample['label'] # Shape: [3, 224, 224]
+
+        # Temporal Sequence (Stack of 9 frames)
+        elif self.mode == "temporal":
+            imgs = []
+            for path in sample['frames']:
+                try:
+                    img = Image.open(path).convert("RGB")
+                    if self.transform: img = self.transform(img)
+                    imgs.append(img)
+                except:
+                    # Safety: If a neighbor frame is missing, return black frame
+                    imgs.append(torch.zeros(3, 224, 224))
+
+            # Check length just in case
+            if len(imgs) == 0: return torch.zeros(self.seq_len, 3, 224, 224), sample['label']
+
+            return torch.stack(imgs), sample['label']  # Shape: [9, 3, 224, 224]
+
     def __len__(self):
         return len(self.samples)
 
-class TemporalScene(VolleyballSceneBase):
-    def __init__(self,root_dir,split,transform=None):
-        super().__init__(root_dir, split)
+class VolleyballPlayerDataset(Dataset):
+    def __init__(self, root_dir, split, mode="spatial", transform=None, seq_len=9):
+
+        self.root_dir = root_dir
+        self.split = split
+        self.mode = mode
         self.transform = transform
-        self.samples: List[Dict[str, Any]] = self._load_annotations("temporal")
+        self.seq_len = seq_len
+
+
+        self.images_root = os.path.join(root_dir, "videos")
+
+        self.annot_root = os.path.join(root_dir, "volleyball_tracking_annotation", "volleyball_tracking_annotation")
+
+        self.classes = ['blocking', 'digging', 'falling', 'jumping',
+                        'moving', 'setting', 'spiking', 'standing', 'waiting']
+        self.class_to_idx = {cls: i for i, cls in enumerate(self.classes)}
+
+        self.split_ids = {
+            'train': [1, 3, 6, 7, 10, 13, 16, 18, 22, 23, 31, 32, 36, 38, 39, 40, 41, 42, 48, 50, 52, 53, 54],
+            'val': [0, 2, 8, 12, 17, 19, 24, 26, 27, 28, 30, 33, 46, 49, 51],
+            'test': [4, 5, 9, 11, 14, 15, 20, 21, 25, 29, 34, 35, 37, 43, 44, 45, 47]
+        }
+
+        self.samples = self._load_data()
+        print(f"[{split.upper()}] Player Dataset ({mode}): {len(self.samples)} samples")
+
+    def _load_data(self):
+        samples = []
+        target_vids = self.split_ids[self.split]
+
+        for vid in target_vids:
+            vid_annot_dir = os.path.join(self.annot_root, str(vid))
+            if not os.path.isdir(vid_annot_dir): continue
+
+            for clip in os.listdir(vid_annot_dir):
+                clip_annot_dir = os.path.join(vid_annot_dir, clip)
+
+                annot_file = os.path.join(clip_annot_dir, f"{clip}.txt")
+
+                if not os.path.exists(annot_file):
+                    continue
+
+                clip_img_dir = os.path.join(self.images_root, str(vid), clip)
+                if not os.path.isdir(clip_img_dir): continue
+
+                track_data = {}
+
+                with open(annot_file, "r") as f:
+                    for line in f:
+                        parts = line.strip().split()
+                        if len(parts) < 10: continue
+
+                        try:
+                            pid = int(parts[0])
+                            x1, y1, x2, y2 = map(int, parts[1:5])
+                            fid = int(parts[5])
+                            lost = int(parts[6])
+                            action = parts[9]
+
+                            # Filter
+                            if lost == 1: continue
+                            if action not in self.class_to_idx: continue
+
+                            # Store info
+                            if pid not in track_data: track_data[pid] = []
+
+                            img_path = os.path.join(clip_img_dir, f"{fid}.jpg")
+
+                            track_data[pid].append({
+                                "path": img_path,
+                                "bbox": (x1, y1, x2, y2),
+                                "label": self.class_to_idx[action],
+                                "fid": fid
+                            })
+                        except:
+                            continue
+
+                # Create Samples from Tracks
+                for pid, frames in track_data.items():
+                    frames.sort(key=lambda x: x['fid'])
+                    if not frames: continue
+
+                    if self.mode == "spatial":
+                        mid = len(frames) // 2
+                        samples.append(frames[mid])
+
+                    elif self.mode == "temporal":
+                        if len(frames) < self.seq_len: continue
+                        mid = len(frames) // 2
+                        start = max(0, mid - self.seq_len // 2)
+                        end = min(len(frames), start + self.seq_len)
+                        seq = frames[start:end]
+                        if len(seq) == self.seq_len:
+                            samples.append(seq)
+
+        return samples
 
     def __len__(self):
         return len(self.samples)
 
     def __getitem__(self, idx):
-        sample = self.samples[idx]
-        sequence = sample["sequence"]
-        label = sample["label"]
-        imgs = []
-        for photo_path in sequence:
-            img = Image.open(photo_path).convert("RGB")
-            if self.transform:
-                img = self.transform(img)
-            imgs.append(img)
-        imgs = torch.stack(imgs)
+        data = self.samples[idx]
 
-        return imgs , label
+        if self.mode == "spatial":
+            return self._process_frame(data), data['label']
+
+        elif self.mode == "temporal":
+            frames = []
+            label = data[len(data) // 2]['label']
+            for frame_info in data:
+                frames.append(self._process_frame(frame_info))
+            return torch.stack(frames), label
+
+    def _process_frame(self, frame_info):
+        path = frame_info['path']
+        bbox = frame_info['bbox']
+        try:
+            with Image.open(path) as img:
+                img = img.convert("RGB")
+                crop = img.crop(bbox)
+                if self.transform:
+                    crop = self.transform(crop)
+                return crop
+        except:
+            return torch.zeros(3, 224, 224)
