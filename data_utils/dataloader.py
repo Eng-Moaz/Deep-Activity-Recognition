@@ -1,6 +1,6 @@
 from torch.utils.data import DataLoader
 from torchvision import transforms
-from dataset import VolleyballSceneDataset, VolleyballPlayerDataset
+from data_utils.dataset import VolleyballSceneDataset, VolleyballPlayerDataset
 
 def get_data_loaders(cfg):
 
