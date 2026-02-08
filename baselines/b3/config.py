@@ -15,9 +15,9 @@ class Config_stg1:
     data_root: str = "/kaggle/input/volleyball/volleyball_"
 
     # Training
-    epochs: int = 12
+    epochs: int = 20
     batch_size: int = 8
-    learning_rate: float = 0.0001
+    learning_rate: float = 1e-4
     weight_decay: float = 0.001
 
     # Model
@@ -39,6 +39,10 @@ class Config_stg1:
 class Config_stg2(Config_stg1):
     # Experiment
     experiment_name: str = "baseline3_stage2"
+
+    #Training
+    epochs: int = 12
+    learning_rate: float = 5e-4
 
     # Model
     num_classes: int = 8
