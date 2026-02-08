@@ -6,7 +6,6 @@ from PIL import Image
 
 class VolleyballSceneDataset(Dataset):
     def __init__(self, root_dir, split, mode="scenecrops", transform=None, seq_len=9):
-
         self.root_dir = root_dir
         self.split = split
         self.mode = mode
@@ -67,7 +66,9 @@ class VolleyballSceneDataset(Dataset):
                     for i in range(0, len(raw_data), 5):
                         try:
                             # Coordinates
-                            x, y, w, h = int(raw_data[i]), int(raw_data[i + 1]), int(raw_data[i + 2]), int(raw_data[i + 3])
+                            x, y, w, h = int(raw_data[i]), int(raw_data[i + 1]), int(raw_data[i + 2]), int(
+                                raw_data[i + 3])
+
                             # Action Label
                             action_str = raw_data[i + 4]
                             if action_str not in self.action_to_idx: continue
@@ -107,25 +108,22 @@ class VolleyballSceneDataset(Dataset):
 
                     # Temporal Sequence (Full Image)
                     elif self.mode == "temporal":
-                        # We have the middle frame (10535.jpg)
-                        # We need to calculate neighbors: 10531...10539
                         try:
-                            fid = int(filename.split('.')[0])  # 10535
+                            fid = int(filename.split('.')[0])
 
                             # Calculate window range
                             half_window = self.seq_len // 2
                             start_fid = fid - half_window
-                            end_fid = fid + half_window + 1  # +1 for range
+                            end_fid = fid + half_window + 1
 
                             frames = []
                             for i in range(start_fid, end_fid):
-                                # Reconstruct path: videos/1/10531.jpg
                                 frame_name = f"{i}.jpg"
                                 frame_path = os.path.join(vid_path, frame_name)
                                 frames.append(frame_path)
 
                             samples.append({
-                                'frames': frames,  # List of seq_length (9) paths
+                                'frames': frames,
                                 'label': scene_label
                             })
                         except:
@@ -135,64 +133,67 @@ class VolleyballSceneDataset(Dataset):
 
     def __getitem__(self, idx):
         sample = self.samples[idx]
-        # Action Training (1 Player and its action label)
-        if self.mode == "action_train":
-            img = Image.open(sample['img_path']).convert("RGB")
-            crop = img.crop(sample['box'])
-            if self.transform: crop = self.transform(crop)
-            return crop, sample['label']  # Shape: [3, 224, 224]
 
-        # Scene Inference (Stack of 12 Players and the scene label)
-        elif self.mode == "scenecrops":
-            img = Image.open(sample['img_path']).convert("RGB")
-            crops = []
-            for p in sample['players']:
-                c = img.crop(p['box'])
-                if self.transform: c = self.transform(c)
-                crops.append(c)
+        try:
+            # Action Training (1 Player)
+            if self.mode == "action_train":
+                img = Image.open(sample['img_path']).convert("RGB")
+                crop = img.crop(sample['box'])
+                if self.transform: crop = self.transform(crop)
+                return crop, sample['label']
 
-            # Pad/Truncate to max_players (12)
-            while len(crops) < self.max_players: crops.append(torch.zeros(3, 224, 224))
-            return torch.stack(crops[:self.max_players]), sample['label']  # Shape: [12, 3, 224, 224]
+            # Scene Inference (Stack of 12 Players)
+            elif self.mode == "scenecrops":
+                img = Image.open(sample['img_path']).convert("RGB")
+                crops = []
+                for p in sample['players']:
+                    c = img.crop(p['box'])
+                    if self.transform: c = self.transform(c)
+                    crops.append(c)
 
-        # Full Image
-        elif self.mode == "scenefull":
-            img = Image.open(sample['img_path']).convert("RGB")
-            if self.transform: img = self.transform(img)
-            return img, sample['label'] # Shape: [3, 224, 224]
+                # Pad to max_players
+                while len(crops) < self.max_players:
+                    crops.append(torch.zeros(3, 224, 224))
 
-        # Temporal Sequence (Stack of 9 frames)
-        elif self.mode == "temporal":
-            imgs = []
-            for path in sample['frames']:
-                try:
-                    img = Image.open(path).convert("RGB")
-                    if self.transform: img = self.transform(img)
-                    imgs.append(img)
-                except:
-                    # Safety: If a neighbor frame is missing, return black frame
-                    imgs.append(torch.zeros(3, 224, 224))
+                return torch.stack(crops[:self.max_players]), sample['label']
 
-            # Check length just in case
-            if len(imgs) == 0: return torch.zeros(self.seq_len, 3, 224, 224), sample['label']
+            # Full Image
+            elif self.mode == "scenefull":
+                img = Image.open(sample['img_path']).convert("RGB")
+                if self.transform: img = self.transform(img)
+                return img, sample['label']
 
-            return torch.stack(imgs), sample['label']  # Shape: [9, 3, 224, 224]
+            # Temporal Sequence (Stack of 9 frames)
+            elif self.mode == "temporal":
+                imgs = []
+                for path in sample['frames']:
+                    try:
+                        img = Image.open(path).convert("RGB")
+                        if self.transform: img = self.transform(img)
+                        imgs.append(img)
+                    except:
+                        # Return black frame if missing
+                        imgs.append(torch.zeros(3, 224, 224))
+
+                return torch.stack(imgs), sample['label']
+
+        except Exception:
+            # Skip corrupt samples
+            return self.__getitem__((idx + 1) % len(self))
 
     def __len__(self):
         return len(self.samples)
 
+
 class VolleyballPlayerDataset(Dataset):
     def __init__(self, root_dir, split, mode="spatial", transform=None, seq_len=9):
-
         self.root_dir = root_dir
         self.split = split
         self.mode = mode
         self.transform = transform
         self.seq_len = seq_len
 
-
         self.images_root = os.path.join(root_dir, "videos")
-
         self.annot_root = os.path.join(root_dir, "volleyball_tracking_annotation", "volleyball_tracking_annotation")
 
         self.classes = ['blocking', 'digging', 'falling', 'jumping',
@@ -218,12 +219,11 @@ class VolleyballPlayerDataset(Dataset):
 
             for clip in os.listdir(vid_annot_dir):
                 clip_annot_dir = os.path.join(vid_annot_dir, clip)
-
                 annot_file = os.path.join(clip_annot_dir, f"{clip}.txt")
 
-                if not os.path.exists(annot_file):
-                    continue
+                if not os.path.exists(annot_file): continue
 
+                # Player Dataset naturally uses the clip folder structure
                 clip_img_dir = os.path.join(self.images_root, str(vid), clip)
                 if not os.path.isdir(clip_img_dir): continue
 
@@ -241,11 +241,9 @@ class VolleyballPlayerDataset(Dataset):
                             lost = int(parts[6])
                             action = parts[9]
 
-                            # Filter
                             if lost == 1: continue
                             if action not in self.class_to_idx: continue
 
-                            # Store info
                             if pid not in track_data: track_data[pid] = []
 
                             img_path = os.path.join(clip_img_dir, f"{fid}.jpg")
@@ -259,7 +257,6 @@ class VolleyballPlayerDataset(Dataset):
                         except:
                             continue
 
-                # Create Samples from Tracks
                 for pid, frames in track_data.items():
                     frames.sort(key=lambda x: x['fid'])
                     if not frames: continue
