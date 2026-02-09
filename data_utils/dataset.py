@@ -25,8 +25,8 @@ class VolleyballSceneDataset(Dataset):
         }
 
         # Scene Labels (8 Classes)
-        self.scene_classes = ['l-pass', 'r-pass', 'l-spike', 'r-spike',
-                              'l-set', 'r-set', 'l-winpoint', 'r-winpoint']
+        self.scene_classes = ['l_pass', 'r_pass','l_spike', 'r_spike',
+                            'l_set', 'r_set','l_winpoint', 'r_winpoint']
         self.scene_to_idx = {cls: i for i, cls in enumerate(self.scene_classes)}
 
         # Action Labels (9 Classes)
@@ -75,7 +75,8 @@ class VolleyballSceneDataset(Dataset):
                     if real_img_path is None: continue
 
                     # Scene Label
-                    scene_label_str = parts[1]
+                    raw_label = parts[1]
+                    scene_label_str = raw_label.replace('-', '_')
                     if scene_label_str not in self.scene_to_idx: continue
                     scene_label = self.scene_to_idx[scene_label_str]
 

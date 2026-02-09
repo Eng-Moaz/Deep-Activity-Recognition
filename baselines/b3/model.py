@@ -15,7 +15,7 @@ class Baseline3_stg1(nn.Module):
         return self.backbone(x)
 
 class Baseline3_stg2(nn.Module):
-    def __init__(self,num_classes,saved_resnet_path):
+    def __init__(self,num_classes,dropout,saved_resnet_path):
         super().__init__()
         # Load the pre-trained model
         self.baseline3_stg1 = Baseline3_stg1(9,0.5)
@@ -31,7 +31,13 @@ class Baseline3_stg2(nn.Module):
         for param in self.backbone.parameters():
             param.requires_grad = False
 
-        self.scene_fc = nn.Linear(2048,num_classes)
+        self.scene_fc = nn.Sequential(
+            nn.Linear(2048,1024),
+            nn.BatchNorm1d(1024),
+            nn.ReLU(),
+            nn.Dropout(p=dropout),
+            nn.Linear(1024,num_classes)
+        )
 
     def forward(self, x):
         # Merge batch_size and num_players
