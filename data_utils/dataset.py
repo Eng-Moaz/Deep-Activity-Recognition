@@ -96,6 +96,8 @@ class VolleyballSceneDataset(Dataset):
                             player_data.append({'box': box, 'action_label': action_label})
                         except:
                             pass
+                    if self.mode in {"action_train", "scenecrops"} and not player_data:
+                        continue
 
                     # Action Training (Single Player)
                     if self.mode == "action_train":
@@ -148,22 +150,25 @@ class VolleyballSceneDataset(Dataset):
     def __getitem__(self, idx):
         sample = self.samples[idx]
 
-        try:
-            # Action Training
-            if self.mode == "action_train":
-                img = Image.open(sample['img_path']).convert("RGB")
+        # Action Training
+        if self.mode == "action_train":
+            with Image.open(sample['img_path']) as img:
+                img = img.convert("RGB")
                 crop = img.crop(sample['box'])
-                if self.transform: crop = self.transform(crop)
+                if self.transform:
+                    crop = self.transform(crop)
                 return crop, sample['label']
 
             # Scene Inference
-            elif self.mode == "scenecrops":
-                img = Image.open(sample['img_path']).convert("RGB")
-                crops = []
-                for p in sample['players']:
-                    c = img.crop(p['box'])
-                    if self.transform: c = self.transform(c)
-                    crops.append(c)
+        if self.mode == "scenecrops":
+            with Image.open(sample['img_path']) as img:
+                img = img.convert("RGB")
+            crops = []
+            for p in sample['players']:
+                c = img.crop(p['box'])
+                if self.transform:
+                    c = self.transform(c)
+                crops.append(c)
 
                 # Pad
                 while len(crops) < self.max_players:
@@ -171,28 +176,28 @@ class VolleyballSceneDataset(Dataset):
                 return torch.stack(crops[:self.max_players]), sample['label']
 
             # Full Image
-            elif self.mode == "scenefull":
-                img = Image.open(sample['img_path']).convert("RGB")
-                if self.transform: img = self.transform(img)
+            if self.mode == "scenefull":
+                with Image.open(sample['img_path']) as img:
+                    img = img.convert("RGB")
+                if self.transform:
+                    img = self.transform(img)
                 return img, sample['label']
 
             # Temporal Sequence
-            elif self.mode == "temporal":
+            if self.mode == "temporal":
                 imgs = []
                 for path in sample['frames']:
                     if os.path.exists(path):
-                        img = Image.open(path).convert("RGB")
-                        if self.transform: img = self.transform(img)
+                        with Image.open(path) as img:
+                            img = img.convert("RGB")
+                        if self.transform:
+                            img = self.transform(img)
                         imgs.append(img)
                     else:
                         imgs.append(torch.zeros(3, 224, 224))
                 return torch.stack(imgs), sample['label']
 
-        except Exception:
-            # Return zero-tensor on failure (Avoids RecursionError)
-            if self.mode == "action_train": return torch.zeros(3, 224, 224), 0
-            if self.mode == "scenecrops": return torch.zeros(12, 3, 224, 224), 0
-            return torch.zeros(3, 224, 224), 0
+            raise ValueError(f"Unknown mode: {self.mode}")
 
     def __len__(self):
         return len(self.samples)

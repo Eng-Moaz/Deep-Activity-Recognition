@@ -98,16 +98,26 @@ def train_stg(stage):
         # Stage 2 requires loading the saved weights from Stage 1
         model = Baseline3_stg2(
             saved_resnet_path=cfg.saved_resnet50_path,
-            num_classes=cfg.num_classes
+            num_classes=cfg.num_classes,
+            dropout=cfg.dropout
         ).to(device)
 
     # Optimizer
     optimizer = optim.AdamW(
-        model.parameters(),
+        filter(lambda p: p.requires_grad, model.parameters()),
         lr=cfg.learning_rate,
         weight_decay=cfg.weight_decay
     )
     criterion = nn.CrossEntropyLoss()
+
+    # Scheduler
+    scheduler = None
+    if cfg.use_scheduler:
+        scheduler = optim.lr_scheduler.StepLR(
+            optimizer,
+            step_size=cfg.step_size,
+            gamma=cfg.gamma,
+        )
 
     # Training Loop
     best_acc = 0.0
@@ -129,6 +139,9 @@ def train_stg(stage):
             best_acc = val_acc
             torch.save(model.state_dict(), cfg.model_save_path)
             print(f"    Saved Best Model ({best_acc:.2f}%)")
+
+    if scheduler is not None:
+        scheduler.step()
 
     # 7. Final Evaluation
     print("\nEvaluating Best Model on Test Set...")
