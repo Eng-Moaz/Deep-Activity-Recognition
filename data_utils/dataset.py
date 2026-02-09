@@ -13,22 +13,18 @@ class VolleyballSceneDataset(Dataset):
         self.transform = transform
         self.max_players = 12
 
-        # 1. Setup Paths (Auto-Detect Logic)
-        self.videos_dir = os.path.join(root_dir, "videos")
+        # --- 1. SET EXACT KAGGLE PATHS ---
+        # We use the paths you just confirmed with the search script
+        self.videos_dir = "/kaggle/input/volleyball/volleyball_/videos"
+        self.tracks_dir = "/kaggle/input/volleyball/volleyball_tracking_annotation/volleyball_tracking_annotation"
 
-        # Check if double nested or single nested
-        double_nest = os.path.join(root_dir, "volleyball_tracking_annotation", "volleyball_tracking_annotation")
-        single_nest = os.path.join(root_dir, "volleyball_tracking_annotation")
+        # Safety Check
+        if not os.path.exists(self.tracks_dir):
+            print(f"❌ ERROR: Tracking path not found at: {self.tracks_dir}")
+            # Fallback for local testing if you download it later
+            self.tracks_dir = os.path.join(root_dir, "volleyball_tracking_annotation")
 
-        if os.path.exists(double_nest):
-            self.tracks_dir = double_nest
-        elif os.path.exists(single_nest):
-            self.tracks_dir = single_nest
-        else:
-            print(f"❌ CRITICAL ERROR: Could not find tracking folder at {double_nest} or {single_nest}")
-            self.tracks_dir = single_nest  # Fallback
-
-        # 2. Splits
+        # --- 2. Splits ---
         self.split_ids = {
             'train': [1, 3, 6, 7, 10, 13, 16, 18, 22, 23, 31, 32, 36, 38, 39, 40, 41, 42, 48, 50, 52, 53, 54],
             'val': [0, 2, 8, 12, 17, 19, 24, 26, 27, 28, 30, 33, 46, 49, 51],
@@ -42,16 +38,15 @@ class VolleyballSceneDataset(Dataset):
                                'waiting']
         self.action_to_idx = {cls: i for i, cls in enumerate(self.action_classes)}
 
-        print(f"[{split.upper()}] Loading Data...")
-        print(f"   > Videos Dir: {self.videos_dir}")
-        print(f"   > Tracks Dir: {self.tracks_dir}")
+        print(f"[{split.upper()}] Loading Data from:")
+        print(f"   > Tracks: {self.tracks_dir}")
 
         self.samples = self._load_data()
 
-        if len(self.samples) == 0:
-            print(f"⚠️ WARNING: Loaded 0 samples! Check the paths above.")
+        if len(self.samples) > 0:
+            print(f"[{split.upper()}] ✅ Success! Loaded {len(self.samples)} precise samples.")
         else:
-            print(f"[{split.upper()}] Success! Loaded {len(self.samples)} samples.")
+            print(f"[{split.upper()}] ⚠️ WARNING: Loaded 0 samples. Check logic.")
 
     def _load_data(self):
         samples = []
@@ -71,20 +66,12 @@ class VolleyballSceneDataset(Dataset):
                             label_str = parts[1].replace('-', '_')
                             if label_str in self.scene_to_idx:
                                 scene_labels[clip_id] = self.scene_to_idx[label_str]
-            else:
-                # Diagnostics for first failure
-                if len(samples) == 0 and vid_id == target_vids[0]:
-                    print(f"   > Missing annotations file: {vid_annot_path}")
 
             # --- STEP B: Get Tracking Boxes ---
             vid_track_dir = os.path.join(self.tracks_dir, str(vid_id))
-            if not os.path.isdir(vid_track_dir):
-                if len(samples) == 0 and vid_id == target_vids[0]:
-                    print(f"   > Missing tracking dir: {vid_track_dir}")
-                continue
+            if not os.path.isdir(vid_track_dir): continue
 
             for clip_id in os.listdir(vid_track_dir):
-                # Ensure we have a label for this clip
                 if clip_id not in scene_labels: continue
 
                 track_file = os.path.join(vid_track_dir, clip_id, f"{clip_id}.txt")
@@ -118,6 +105,7 @@ class VolleyballSceneDataset(Dataset):
                 end_window = center_frame + 4
 
                 for fid in frames_data.keys():
+                    # Window Logic
                     if self.split == 'train':
                         if not (start_window <= fid <= end_window): continue
                     else:
