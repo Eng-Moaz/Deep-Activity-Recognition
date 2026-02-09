@@ -3,6 +3,7 @@ import torch
 from torch.utils.data import Dataset
 from PIL import Image
 import glob
+from collections import defaultdict
 
 
 class VolleyballSceneDataset(Dataset):
@@ -15,6 +16,9 @@ class VolleyballSceneDataset(Dataset):
         self.max_players = 12
         self.seq_len = seq_len
 
+        # Diagnostics
+        self.stats = defaultdict(int)
+
         self.videos_dir = os.path.join(root_dir, "videos")
 
         # Splits
@@ -25,8 +29,8 @@ class VolleyballSceneDataset(Dataset):
         }
 
         # Scene Labels (8 Classes)
-        self.scene_classes = ['l_pass', 'r_pass','l_spike', 'r_spike',
-                            'l_set', 'r_set','l_winpoint', 'r_winpoint']
+        self.scene_classes = ['l_pass', 'r_pass', 'l_spike', 'r_spike',
+                              'l_set', 'r_set', 'l_winpoint', 'r_winpoint']
         self.scene_to_idx = {cls: i for i, cls in enumerate(self.scene_classes)}
 
         # Action Labels (9 Classes)
@@ -35,7 +39,7 @@ class VolleyballSceneDataset(Dataset):
         self.action_to_idx = {cls: i for i, cls in enumerate(self.action_classes)}
 
         self.samples = self._load_data()
-        print(f"[{split.upper()}] Loaded {len(self.samples)} samples (Mode: {mode})")
+        self._print_stats()
 
     def _resolve_path(self, vid_path, filename):
         # 1. Try direct path (videos/1/100.jpg)
@@ -51,6 +55,12 @@ class VolleyballSceneDataset(Dataset):
             return found_path, os.path.dirname(found_path)
 
         return None, None
+
+    def _print_stats(self):
+        print(f"[{self.split.upper()}] Loaded {len(self.samples)} samples (Mode: {self.mode})")
+        if self.mode == 'scenecrops' and self.split == 'train':
+            print(f"   > Expansion Stats: {self.stats['expanded_frames']} neighbor frames added.")
+            print(f"   > Missing Neighbors: {self.stats['missing_neighbors']}")
 
     def _load_data(self):
         samples = []
@@ -96,6 +106,7 @@ class VolleyballSceneDataset(Dataset):
                             player_data.append({'box': box, 'action_label': action_label})
                         except:
                             pass
+
                     if self.mode in {"action_train", "scenecrops"} and not player_data:
                         continue
 
@@ -110,11 +121,42 @@ class VolleyballSceneDataset(Dataset):
 
                     # Scene Inference (Group players)
                     elif self.mode == "scenecrops":
-                        samples.append({
-                            'img_path': real_img_path,
-                            'players': player_data,
-                            'label': scene_label
-                        })
+                        # --- DATA EXPANSION LOGIC START ---
+                        # If training, expand to neighbors (Center +/- 4)
+                        if self.split == 'train':
+                            try:
+                                center_fid = int(filename.split('.')[0])
+                                # Loop -4 to +4
+                                for offset in range(-4, 5):
+                                    curr_fid = center_fid + offset
+                                    # Assume neighbor is in same dir as center frame
+                                    neighbor_name = f"{curr_fid}.jpg"
+                                    neighbor_path = os.path.join(clip_dir, neighbor_name)
+
+                                    if os.path.exists(neighbor_path):
+                                        samples.append({
+                                            'img_path': neighbor_path,
+                                            'players': player_data,  # Use center frame boxes
+                                            'label': scene_label
+                                        })
+                                        if offset != 0: self.stats['expanded_frames'] += 1
+                                    else:
+                                        self.stats['missing_neighbors'] += 1
+                            except:
+                                # Fallback if filename parsing fails
+                                samples.append({
+                                    'img_path': real_img_path,
+                                    'players': player_data,
+                                    'label': scene_label
+                                })
+                        else:
+                            # Validation/Test: No expansion
+                            samples.append({
+                                'img_path': real_img_path,
+                                'players': player_data,
+                                'label': scene_label
+                            })
+                        # --- DATA EXPANSION LOGIC END ---
 
                     # Full Image
                     elif self.mode == "scenefull":
@@ -165,15 +207,23 @@ class VolleyballSceneDataset(Dataset):
                 img = img.convert("RGB")
             crops = []
             for p in sample['players']:
-                c = img.crop(p['box'])
+                # Safety Clamp for Boxes
+                box = p['box']
+                box = (max(0, box[0]), max(0, box[1]), min(img.width, box[2]), min(img.height, box[3]))
+
+                # Skip invalid boxes
+                if box[2] <= box[0] or box[3] <= box[1]:
+                    continue
+
+                c = img.crop(box)
                 if self.transform:
                     c = self.transform(c)
                 crops.append(c)
 
-                # Pad
-                while len(crops) < self.max_players:
-                    crops.append(torch.zeros(3, 224, 224))
-                return torch.stack(crops[:self.max_players]), sample['label']
+            # Pad
+            while len(crops) < self.max_players:
+                crops.append(torch.zeros(3, 224, 224))
+            return torch.stack(crops[:self.max_players]), sample['label']
 
             # Full Image
             if self.mode == "scenefull":
