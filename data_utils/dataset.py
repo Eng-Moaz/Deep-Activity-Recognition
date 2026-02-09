@@ -13,11 +13,22 @@ class VolleyballSceneDataset(Dataset):
         self.transform = transform
         self.max_players = 12
 
-        # Define Paths
+        # 1. Setup Paths (Auto-Detect Logic)
         self.videos_dir = os.path.join(root_dir, "videos")
-        self.tracks_dir = os.path.join(root_dir, "volleyball_tracking_annotation", "volleyball_tracking_annotation")
 
-        # Define Splits
+        # Check if double nested or single nested
+        double_nest = os.path.join(root_dir, "volleyball_tracking_annotation", "volleyball_tracking_annotation")
+        single_nest = os.path.join(root_dir, "volleyball_tracking_annotation")
+
+        if os.path.exists(double_nest):
+            self.tracks_dir = double_nest
+        elif os.path.exists(single_nest):
+            self.tracks_dir = single_nest
+        else:
+            print(f"❌ CRITICAL ERROR: Could not find tracking folder at {double_nest} or {single_nest}")
+            self.tracks_dir = single_nest  # Fallback
+
+        # 2. Splits
         self.split_ids = {
             'train': [1, 3, 6, 7, 10, 13, 16, 18, 22, 23, 31, 32, 36, 38, 39, 40, 41, 42, 48, 50, 52, 53, 54],
             'val': [0, 2, 8, 12, 17, 19, 24, 26, 27, 28, 30, 33, 46, 49, 51],
@@ -31,16 +42,23 @@ class VolleyballSceneDataset(Dataset):
                                'waiting']
         self.action_to_idx = {cls: i for i, cls in enumerate(self.action_classes)}
 
-        # Load Data using the "Merge Strategy"
-        print(f"[{split.upper()}] Loading Data (Merging Scene Labels + Tracking Boxes)...")
+        print(f"[{split.upper()}] Loading Data...")
+        print(f"   > Videos Dir: {self.videos_dir}")
+        print(f"   > Tracks Dir: {self.tracks_dir}")
+
         self.samples = self._load_data()
-        print(f"[{split.upper()}] Loaded {len(self.samples)} precise samples (Mode: {mode}).")
+
+        if len(self.samples) == 0:
+            print(f"⚠️ WARNING: Loaded 0 samples! Check the paths above.")
+        else:
+            print(f"[{split.upper()}] Success! Loaded {len(self.samples)} samples.")
 
     def _load_data(self):
         samples = []
         target_vids = self.split_ids.get(self.split, [])
 
         for vid_id in target_vids:
+            # --- STEP A: Get Scene Labels ---
             scene_labels = {}
             vid_annot_path = os.path.join(self.videos_dir, str(vid_id), 'annotations.txt')
 
@@ -53,33 +71,38 @@ class VolleyballSceneDataset(Dataset):
                             label_str = parts[1].replace('-', '_')
                             if label_str in self.scene_to_idx:
                                 scene_labels[clip_id] = self.scene_to_idx[label_str]
+            else:
+                # Diagnostics for first failure
+                if len(samples) == 0 and vid_id == target_vids[0]:
+                    print(f"   > Missing annotations file: {vid_annot_path}")
 
+            # --- STEP B: Get Tracking Boxes ---
             vid_track_dir = os.path.join(self.tracks_dir, str(vid_id))
-            if not os.path.isdir(vid_track_dir): continue
+            if not os.path.isdir(vid_track_dir):
+                if len(samples) == 0 and vid_id == target_vids[0]:
+                    print(f"   > Missing tracking dir: {vid_track_dir}")
+                continue
 
             for clip_id in os.listdir(vid_track_dir):
-                # For Stage 2, we need a Scene Label. For Stage 1 (action_train), we technically don't,
-                # but it's safer to stick to the labeled subset.
+                # Ensure we have a label for this clip
                 if clip_id not in scene_labels: continue
 
                 track_file = os.path.join(vid_track_dir, clip_id, f"{clip_id}.txt")
                 if not os.path.exists(track_file): continue
 
-                # Parse the Tracking File
+                # Parse Tracking
                 frames_data = defaultdict(list)
                 with open(track_file, 'r') as f:
                     for line in f:
                         parts = line.strip().split()
                         try:
-                            # Tracking Format: [TrackID, x, y, x2, y2, FrameID, Lost, ..., Action]
+                            # [TrackID, x, y, x2, y2, FrameID, Lost, ..., Action]
                             fid = int(parts[5])
                             lost = int(parts[6])
                             action_str = parts[9]
                             if lost == 1: continue
 
                             box = (int(parts[1]), int(parts[2]), int(parts[3]), int(parts[4]))
-
-                            # For action_train, we need the individual action label
                             action_label = self.action_to_idx.get(action_str, 0)
 
                             frames_data[fid].append({
@@ -89,12 +112,12 @@ class VolleyballSceneDataset(Dataset):
                         except:
                             pass
 
+                # --- STEP C: Generate Samples ---
                 center_frame = int(clip_id)
                 start_window = center_frame - 4
                 end_window = center_frame + 4
 
                 for fid in frames_data.keys():
-                    # Window Filter
                     if self.split == 'train':
                         if not (start_window <= fid <= end_window): continue
                     else:
@@ -105,8 +128,8 @@ class VolleyballSceneDataset(Dataset):
                     img_path = os.path.join(self.videos_dir, str(vid_id), clip_id, f"{fid}.jpg")
                     if not os.path.exists(img_path): continue
 
+                    # Logic per mode
                     if self.mode == 'scenecrops':
-                        # Extract just the boxes for the scene
                         player_boxes = [p['box'] for p in frames_data[fid]]
                         samples.append({
                             'img_path': img_path,
@@ -115,12 +138,11 @@ class VolleyballSceneDataset(Dataset):
                         })
 
                     elif self.mode == 'action_train':
-                        # One sample per PLAYER
                         for p in frames_data[fid]:
                             samples.append({
                                 'img_path': img_path,
                                 'box': p['box'],
-                                'label': p['action_label']  # Individual Action Label
+                                'label': p['action_label']
                             })
 
                     elif self.mode == 'scenefull':
@@ -133,7 +155,6 @@ class VolleyballSceneDataset(Dataset):
 
     def __getitem__(self, idx):
         sample = self.samples[idx]
-
         try:
             with Image.open(sample['img_path']) as img:
                 img = img.convert("RGB")
@@ -146,21 +167,13 @@ class VolleyballSceneDataset(Dataset):
                             c = img.crop(box)
                             if self.transform: c = self.transform(c)
                             crops.append(c)
-
-                    # Pad
                     if len(crops) > self.max_players: crops = crops[:self.max_players]
                     while len(crops) < self.max_players: crops.append(torch.zeros(3, 224, 224))
                     return torch.stack(crops), sample['label']
 
                 elif self.mode == 'action_train':
                     box = self._clamp_box(sample['box'], img.width, img.height)
-                    if self._is_valid(box):
-                        c = img.crop(box)
-                    else:
-                        c = torch.zeros(3, 224, 224)  # Fallback for bad box
-                        if self.transform: c = self.transform(Image.new('RGB', (224, 224)))
-                        return c, sample['label']
-
+                    c = img.crop(box) if self._is_valid(box) else torch.zeros(3, 224, 224)
                     if self.transform: c = self.transform(c)
                     return c, sample['label']
 
@@ -168,10 +181,8 @@ class VolleyballSceneDataset(Dataset):
                     if self.transform: img = self.transform(img)
                     return img, sample['label']
 
-        except Exception as e:
-            # Fallback for corrupt images
+        except:
             if self.mode == 'scenecrops': return torch.zeros(12, 3, 224, 224), 0
-            if self.mode == 'action_train': return torch.zeros(3, 224, 224), 0
             return torch.zeros(3, 224, 224), 0
 
     def _clamp_box(self, box, w, h):
