@@ -23,12 +23,12 @@ def get_data_loaders(cfg):
         task = "scene"
     elif "baseline3_stage1" in exp_name:
         mode = "action_train"   # B3 Step A: Single Player Crops
-        task = "scene"
+        task = "player"
     elif "baseline3_stage2" in exp_name:
         mode = "scenecrops"     # B3 Step B: Stack of 12 Players
         task = "scene"
     elif "baseline4" in exp_name:
-        mode = "temporal"       # B4: Sequence of 9 Frames
+        mode = "scenefull_temporal"       # B4: Sequence of 9 Frames
         task = "scene"
     elif "baseline5" in exp_name:
         mode = "temporal"       # B5: Sequence of Tracking Crops
