@@ -6,34 +6,34 @@ from collections import defaultdict
 
 
 class VolleyballSceneDataset(Dataset):
-    def __init__(self, root_dir, split, mode="scenecrops", transform=None):
+    def __init__(self, root_dir, split, mode, seq_len, transform=None):
         self.root_dir = root_dir
         self.split = split
         self.mode = mode
         self.transform = transform
         self.max_players = 12
+        self.seq_len = seq_len
 
-        # --- 1. SET EXACT KAGGLE PATHS ---
-        # We use the paths you just confirmed with the search script
+        # Paths
         self.videos_dir = "/kaggle/input/volleyball/volleyball_/videos"
         self.tracks_dir = "/kaggle/input/volleyball/volleyball_tracking_annotation/volleyball_tracking_annotation"
 
         # Safety Check
         if not os.path.exists(self.tracks_dir):
-            print(f"❌ ERROR: Tracking path not found at: {self.tracks_dir}")
-            # Fallback for local testing if you download it later
-            self.tracks_dir = os.path.join(root_dir, "volleyball_tracking_annotation")
+            print(f"Tracking path not found at: {self.tracks_dir}")
 
-        # --- 2. Splits ---
+        # Splits
         self.split_ids = {
             'train': [1, 3, 6, 7, 10, 13, 16, 18, 22, 23, 31, 32, 36, 38, 39, 40, 41, 42, 48, 50, 52, 53, 54],
             'val': [0, 2, 8, 12, 17, 19, 24, 26, 27, 28, 30, 33, 46, 49, 51],
             'test': [4, 5, 9, 11, 14, 15, 20, 21, 25, 29, 34, 35, 37, 43, 44, 45, 47]
         }
 
+        # Full Scene Classes (8 Classes)
         self.scene_classes = ['l_pass', 'r_pass', 'l_spike', 'r_spike', 'l_set', 'r_set', 'l_winpoint', 'r_winpoint']
         self.scene_to_idx = {cls: i for i, cls in enumerate(self.scene_classes)}
 
+        # Player Actions Classes (8 Classes)
         self.action_classes = ['blocking', 'digging', 'falling', 'jumping', 'moving', 'setting', 'spiking', 'standing',
                                'waiting']
         self.action_to_idx = {cls: i for i, cls in enumerate(self.action_classes)}
@@ -43,17 +43,18 @@ class VolleyballSceneDataset(Dataset):
 
         self.samples = self._load_data()
 
+        # Verification
         if len(self.samples) > 0:
-            print(f"[{split.upper()}] ✅ Success! Loaded {len(self.samples)} precise samples.")
+            print(f"[{split.upper()}] Loaded {len(self.samples)} samples.")
         else:
-            print(f"[{split.upper()}] ⚠️ WARNING: Loaded 0 samples. Check logic.")
+            print(f"[{split.upper()}] Error , Loaded 0 samples.")
 
     def _load_data(self):
         samples = []
         target_vids = self.split_ids.get(self.split, [])
 
         for vid_id in target_vids:
-            # --- STEP A: Get Scene Labels ---
+            # Scene Labels
             scene_labels = {}
             vid_annot_path = os.path.join(self.videos_dir, str(vid_id), 'annotations.txt')
 
@@ -67,7 +68,7 @@ class VolleyballSceneDataset(Dataset):
                             if label_str in self.scene_to_idx:
                                 scene_labels[clip_id] = self.scene_to_idx[label_str]
 
-            # --- STEP B: Get Tracking Boxes ---
+            # Tracking Boxes
             vid_track_dir = os.path.join(self.tracks_dir, str(vid_id))
             if not os.path.isdir(vid_track_dir): continue
 
@@ -82,8 +83,9 @@ class VolleyballSceneDataset(Dataset):
                 with open(track_file, 'r') as f:
                     for line in f:
                         parts = line.strip().split()
+
                         try:
-                            # [TrackID, x, y, x2, y2, FrameID, Lost, ..., Action]
+                            # [PlayerID, x1, y1, x2, y2, FrameID, Lost, ..., Action]
                             fid = int(parts[5])
                             lost = int(parts[6])
                             action_str = parts[9]
@@ -99,10 +101,11 @@ class VolleyballSceneDataset(Dataset):
                         except:
                             pass
 
-                # --- STEP C: Generate Samples ---
+                # Generate Samples
                 center_frame = int(clip_id)
-                start_window = center_frame - 4
-                end_window = center_frame + 4
+                mid = self.seq_len // 2
+                start_window = center_frame - mid
+                end_window = center_frame + mid
 
                 for fid in frames_data.keys():
                     # Window Logic
@@ -116,7 +119,7 @@ class VolleyballSceneDataset(Dataset):
                     img_path = os.path.join(self.videos_dir, str(vid_id), clip_id, f"{fid}.jpg")
                     if not os.path.exists(img_path): continue
 
-                    # Logic per mode
+                    # All players once as a batch
                     if self.mode == 'scenecrops':
                         player_boxes = [p['box'] for p in frames_data[fid]]
                         samples.append({
@@ -125,6 +128,7 @@ class VolleyballSceneDataset(Dataset):
                             'label': scene_labels[clip_id]
                         })
 
+                    # Each player on his own
                     elif self.mode == 'action_train':
                         for p in frames_data[fid]:
                             samples.append({
@@ -133,9 +137,17 @@ class VolleyballSceneDataset(Dataset):
                                 'label': p['action_label']
                             })
 
+                    # Full scene
                     elif self.mode == 'scenefull':
                         samples.append({
                             'img_path': img_path,
+                            'label': scene_labels[clip_id]
+                        })
+
+                    elif self.mode == "scenefull_temporal":
+                        img_paths = [img_path for img_path in range(start_window,end_window+1)]
+                        samples.append({
+                            'img_paths': img_paths,
                             'label': scene_labels[clip_id]
                         })
 
@@ -172,6 +184,11 @@ class VolleyballSceneDataset(Dataset):
         except:
             if self.mode == 'scenecrops': return torch.zeros(12, 3, 224, 224), 0
             return torch.zeros(3, 224, 224), 0
+
+        if self.mode == "scenefull_temporal":
+            imgs = [Image.open(img) for img in sample["img_paths"]]
+            label = sample["label"]
+            return imgs , label
 
     def _clamp_box(self, box, w, h):
         return (max(0, box[0]), max(0, box[1]), min(w, box[2]), min(h, box[3]))
