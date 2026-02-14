@@ -33,6 +33,8 @@ class Config:
     learning_rate: float = 0.0001
     weight_decay: float = 0.001
     optimizer: str = "AdamW"
+    use_amp: bool = True
+    patience: int = 5
 
     # Model (LSTM Specifics)
     num_classes: int = 8

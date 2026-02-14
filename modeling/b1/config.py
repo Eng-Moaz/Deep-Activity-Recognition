@@ -43,6 +43,8 @@ class Config:
     optimizer: str = "AdamW"
     weight_decay: float = 0.0001
     epochs: int = 15
+    use_amp: bool = True
+    patience: int = 5
 
     # Scheduler
     use_scheduler: bool = False
