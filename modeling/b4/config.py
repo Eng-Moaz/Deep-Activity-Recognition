@@ -20,11 +20,11 @@ class Config:
     # Paths — portable via env vars, Kaggle defaults
     videos_dir: str = os.environ.get(
         "VOLLEYBALL_VIDEOS_DIR",
-        "/kaggle/input/volleyball/volleyball_/videos",
+        "/kaggle/input/datasets/ahmedmohamed365/volleyball/volleyball_/videos",
     )
     tracks_dir: str = os.environ.get(
         "VOLLEYBALL_TRACKS_DIR",
-        "/kaggle/input/volleyball/volleyball_tracking_annotation/volleyball_tracking_annotation",
+        "/kaggle/input/datasets/ahmedmohamed365/volleyball/volleyball_tracking_annotation/volleyball_tracking_annotation",
     )
 
     # Training
