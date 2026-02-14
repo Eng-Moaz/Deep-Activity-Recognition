@@ -1,0 +1,44 @@
+[project]
+name = "deep-activity-recognition"
+version = "0.1.0"
+description = "Deep Activity Recognition on Volleyball Dataset"
+requires-python = ">=3.9"
+dependencies = [
+    "torch>=2.0",
+    "torchvision>=0.15",
+    "tqdm",
+    "Pillow",
+    "numpy",
+    "matplotlib",
+    "seaborn",
+    "scikit-learn",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff",
+    "pytest",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py39"
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "B",    # flake8-bugbear
+    "UP",   # pyupgrade
+]
+ignore = [
+    "E501",  # line too long (handled by formatter)
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["baselines", "data_utils", "helper_utils", "training"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -1,11 +1,16 @@
-import torch
+"""Evaluation utilities — baseline-agnostic confusion matrix and classification report."""
+
 import numpy as np
+import torch
+import matplotlib
+matplotlib.use("Agg")  # Non-interactive backend (useful for Kaggle)
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.metrics import confusion_matrix, classification_report
+from sklearn.metrics import classification_report, confusion_matrix
 
 
-def evaluate_test_set(model, data_loader, device, classes,save_path=None):
+def evaluate_test_set(model, data_loader, device, classes, name, save_path=None):
+
     model.eval()
     y_true = []
     y_pred = []
@@ -35,7 +40,8 @@ def evaluate_test_set(model, data_loader, device, classes,save_path=None):
                 xticklabels=classes, yticklabels=classes)
     plt.xlabel('Predicted Label')
     plt.ylabel('True Label')
-    plt.title('Confusion Matrix - Baseline 1 (Spatial)')
+
+    plt.title(f"Confusion Matrix \n{name}")
     plt.tight_layout()
 
     if save_path:
