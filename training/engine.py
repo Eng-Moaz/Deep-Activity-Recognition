@@ -12,25 +12,33 @@ from helper_utils.evaluation import evaluate_test_set
 from training.reproducibility import dump_run_metadata, set_seed
 
 
-def train_one_epoch(model, loader, criterion, optimizer, device):
+def train_one_epoch(model, loader, criterion, optimizer, device, scaler=None):
     model.train()
     running_loss = 0.0
     correct = 0
     total = 0
+    use_amp = scaler is not None
 
     loop = tqdm(loader, desc="Training", leave=False)
     for batch_idx, (images, labels) in enumerate(loop):
         images = images.to(device)
         labels = labels.to(device)
 
-        # Forward
-        outputs = model(images)
-        loss = criterion(outputs, labels)
+        optimizer.zero_grad(set_to_none=True)
 
-        # Backward
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
+        # Forward (with AMP)
+        with torch.amp.autocast("cuda", enabled=use_amp):
+            outputs = model(images)
+            loss = criterion(outputs, labels)
+
+        # Backward (with AMP)
+        if use_amp:
+            scaler.scale(loss).backward()
+            scaler.step(optimizer)
+            scaler.update()
+        else:
+            loss.backward()
+            optimizer.step()
 
         # Stats
         running_loss += loss.item()
@@ -45,7 +53,7 @@ def train_one_epoch(model, loader, criterion, optimizer, device):
     return epoch_loss, epoch_acc
 
 
-def validate(model, loader, criterion, device):
+def validate(model, loader, criterion, device, use_amp=False):
     model.eval()
     running_loss = 0.0
     correct = 0
@@ -56,8 +64,9 @@ def validate(model, loader, criterion, device):
             images = images.to(device)
             labels = labels.to(device)
 
-            outputs = model(images)
-            loss = criterion(outputs, labels)
+            with torch.amp.autocast("cuda", enabled=use_amp):
+                outputs = model(images)
+                loss = criterion(outputs, labels)
 
             running_loss += loss.item()
             _, predicted = torch.max(outputs, 1)
@@ -108,6 +117,16 @@ def run_training(cfg, model, train_loader, val_loader, test_loader, device):
     scheduler = _build_scheduler(cfg, optimizer)
     criterion = nn.CrossEntropyLoss()
 
+    # Mixed Precision
+    use_amp = getattr(cfg, "use_amp", False) and device.type == "cuda"
+    scaler = torch.amp.GradScaler("cuda") if use_amp else None
+    if use_amp:
+        print("[INFO] Mixed Precision (AMP) enabled")
+
+    # Early Stopping
+    patience = getattr(cfg, "patience", 0)
+    epochs_no_improve = 0
+
     # TensorBoard
     writer = SummaryWriter(log_dir=f"runs/{cfg.experiment_name}")
 
@@ -117,8 +136,12 @@ def run_training(cfg, model, train_loader, val_loader, test_loader, device):
     for epoch in range(cfg.epochs):
         print(f"\nEpoch {epoch + 1}/{cfg.epochs}")
 
-        train_loss, train_acc = train_one_epoch(model, train_loader, criterion, optimizer, device)
-        val_loss, val_acc = validate(model, val_loader, criterion, device)
+        train_loss, train_acc = train_one_epoch(
+            model, train_loader, criterion, optimizer, device, scaler=scaler,
+        )
+        val_loss, val_acc = validate(
+            model, val_loader, criterion, device, use_amp=use_amp,
+        )
 
         print(f"    Train Loss: {train_loss:.4f} | Acc: {train_acc:.2f}%")
         print(f"    Val Loss:   {val_loss:.4f} | Acc: {val_acc:.2f}%")
@@ -133,6 +156,14 @@ def run_training(cfg, model, train_loader, val_loader, test_loader, device):
             best_acc = val_acc
             torch.save(model.state_dict(), cfg.model_save_path)
             print(f"    Saved Best Model ({best_acc:.2f}%)")
+            epochs_no_improve = 0
+        else:
+            epochs_no_improve += 1
+
+        # Early Stopping
+        if patience > 0 and epochs_no_improve >= patience:
+            print(f"    Early stopping triggered (no improvement for {patience} epochs)")
+            break
 
         if scheduler is not None:
             scheduler.step()

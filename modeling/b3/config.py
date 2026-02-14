@@ -28,11 +28,13 @@ class Config_stg1:
     )
 
     # Training
-    epochs: int = 20
+    epochs: int = 12
     batch_size: int = 64
     learning_rate: float = 1e-4
     weight_decay: float = 0.001
     optimizer: str = "AdamW"
+    use_amp: bool = True
+    patience: int = 5
 
     # Model
     num_classes: int = 9
