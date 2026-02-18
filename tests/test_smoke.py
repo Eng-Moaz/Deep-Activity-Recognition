@@ -48,7 +48,7 @@ def test_b6_config_imports():
     assert cfg.input_mode == "scenecrops_temporal"
     assert cfg.num_classes == 8
     assert cfg.num_classes_stg1 == 9
-    assert cfg.hidden_size == 256
+    assert cfg.hidden_size == 512
     assert hasattr(cfg, "saved_resnet50_path")
 
 

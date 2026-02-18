@@ -12,7 +12,7 @@ from helper_utils.evaluation import evaluate_test_set
 from training.reproducibility import dump_run_metadata, set_seed
 
 
-def train_one_epoch(model, loader, criterion, optimizer, device, scaler=None):
+def train_one_epoch(model, loader, criterion, optimizer, device, scaler=None, grad_clip_norm=0.0):
     model.train()
     running_loss = 0.0
     correct = 0
@@ -34,10 +34,15 @@ def train_one_epoch(model, loader, criterion, optimizer, device, scaler=None):
         # Backward (with AMP)
         if use_amp:
             scaler.scale(loss).backward()
+            if grad_clip_norm > 0:
+                scaler.unscale_(optimizer)
+                nn.utils.clip_grad_norm_(model.parameters(), grad_clip_norm)
             scaler.step(optimizer)
             scaler.update()
         else:
             loss.backward()
+            if grad_clip_norm > 0:
+                nn.utils.clip_grad_norm_(model.parameters(), grad_clip_norm)
             optimizer.step()
 
         # Stats
@@ -123,7 +128,15 @@ def run_training(cfg, model, train_loader, val_loader, test_loader, device):
     trainable_params = filter(lambda p: p.requires_grad, model.parameters())
     optimizer = _build_optimizer(cfg, trainable_params)
     scheduler = _build_scheduler(cfg, optimizer)
-    criterion = nn.CrossEntropyLoss()
+    label_smoothing = getattr(cfg, "label_smoothing", 0.0)
+    criterion = nn.CrossEntropyLoss(label_smoothing=label_smoothing)
+    if label_smoothing > 0:
+        print(f"[INFO] Label Smoothing = {label_smoothing}")
+
+    # Gradient Clipping
+    grad_clip_norm = getattr(cfg, "grad_clip_norm", 0.0)
+    if grad_clip_norm > 0:
+        print(f"[INFO] Gradient Clipping max_norm = {grad_clip_norm}")
 
     # Mixed Precision
     use_amp = getattr(cfg, "use_amp", False) and device.type == "cuda"
@@ -145,7 +158,8 @@ def run_training(cfg, model, train_loader, val_loader, test_loader, device):
         print(f"\nEpoch {epoch + 1}/{cfg.epochs}")
 
         train_loss, train_acc = train_one_epoch(
-            model, train_loader, criterion, optimizer, device, scaler=scaler,
+            model, train_loader, criterion, optimizer, device,
+            scaler=scaler, grad_clip_norm=grad_clip_norm,
         )
         val_loss, val_acc = validate(
             model, val_loader, criterion, device, use_amp=use_amp,

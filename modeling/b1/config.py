@@ -37,14 +37,15 @@ class Config:
     ])
 
     # Training
-    batch_size: int = 64
-    learning_rate: float = 0.001
+    batch_size: int = 256
+    learning_rate: float = 1e-4
     dropout: float = 0.6
     optimizer: str = "AdamW"
     weight_decay: float = 0.0001
-    epochs: int = 15
+    epochs: int = 5
     use_amp: bool = True
     patience: int = 5
+    label_smoothing: float = 0.1
 
     # Scheduler
     use_scheduler: bool = False

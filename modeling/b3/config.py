@@ -28,8 +28,8 @@ class Config_stg1:
     )
 
     # Training
-    epochs: int = 12
-    batch_size: int = 64
+    epochs: int = 5
+    batch_size: int = 128
     learning_rate: float = 1e-4
     weight_decay: float = 0.001
     optimizer: str = "AdamW"
@@ -67,9 +67,13 @@ class Config_stg2(Config_stg1):
     input_mode: str = "scenecrops"   # Stage 2: stack of 12 player crops
 
     # Training
-    epochs: int = 12
-    learning_rate: float = 5e-4
-    batch_size: int = 8
+    epochs: int = 15
+    learning_rate: float = 1e-4
+    batch_size: int = 32
+    patience: int = 10
+    label_smoothing: float = 0.1
+    scheduler_type: str = "ReduceLROnPlateau"
+    scheduler_patience: int = 2
 
     # Model
     num_classes: int = 8

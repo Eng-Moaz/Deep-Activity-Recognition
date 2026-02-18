@@ -27,17 +27,19 @@ class Config_stg1:
     )
 
     # Training
-    epochs: int = 10
+    epochs: int = 20
     batch_size: int = 16
-    learning_rate: float = 1e-4
-    weight_decay: float = 0.001
+    learning_rate: float = 1e-5
+    weight_decay: float = 0.1
     optimizer: str = "AdamW"
     use_amp: bool = True
     patience: int = 5
+    grad_clip_norm: float = 1.0
+    label_smoothing: float = 0.02
 
     # Model
     num_classes: int = 9
-    hidden_size: int = 256
+    hidden_size: int = 128
     lstm_layers: int = 1
     dropout: float = 0.5
 
@@ -69,9 +71,13 @@ class Config_stg2(Config_stg1):
     input_mode: str = "scenecrops_temporal"
 
     # Training
-    epochs: int = 12
-    batch_size: int = 4    # smaller batch — (B, 9, 12, 3, 224, 224) is large
-    learning_rate: float = 5e-4
+    epochs: int = 35
+    batch_size: int = 8
+    learning_rate: float = 1e-4
+    patience: int = 10
+    label_smoothing: float = 0.1
+    scheduler_type: str = "ReduceLROnPlateau"
+    scheduler_patience: int = 2
 
     # Model
     num_classes: int = 8

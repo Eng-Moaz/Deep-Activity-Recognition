@@ -28,17 +28,19 @@ class Config:
     )
 
     # Training
-    epochs: int = 12
-    batch_size: int = 8
-    learning_rate: float = 0.0001
+    epochs: int = 35
+    batch_size: int = 16
+    learning_rate: float = 1e-4
     weight_decay: float = 0.001
     optimizer: str = "AdamW"
     use_amp: bool = True
-    patience: int = 5
+    patience: int = 10
+    grad_clip_norm: float = 1.0
+    label_smoothing: float = 0.15
 
     # Model (LSTM Specifics)
     num_classes: int = 8
-    hidden_size: int = 256
+    hidden_size: int = 512
     lstm_layers: int = 1
     dropout: float = 0.5
 
@@ -51,7 +53,8 @@ class Config:
 
     # Scheduler
     use_scheduler: bool = True
-    step_size: int = 10
+    scheduler_type: str = "ReduceLROnPlateau"
+    scheduler_patience: int = 2
     gamma: float = 0.1
 
     # Reproducibility

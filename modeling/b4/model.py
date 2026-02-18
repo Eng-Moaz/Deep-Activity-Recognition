@@ -28,8 +28,11 @@ class Baseline4(nn.Module):
             batch_first=True
         )
 
-        # Last fc Layer
-        self.fc = nn.Linear(cfg.hidden_size, cfg.num_classes)
+        # Classifier
+        self.fc = nn.Sequential(
+            nn.Dropout(p=cfg.dropout),
+            nn.Linear(cfg.hidden_size, cfg.num_classes),
+        )
 
     def forward(self, x):
         # Merge batch_size and seq_length
