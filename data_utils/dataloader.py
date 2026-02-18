@@ -9,7 +9,7 @@ from data_utils.dataset import VolleyballPlayerDataset, VolleyballSceneDataset
 def get_data_loaders(cfg):
     """Build train/val/test DataLoaders from config."""
 
-    # Training transform — with augmentation
+    # Training transform 
     train_transform = transforms.Compose([
         transforms.Resize((224, 224)),
         transforms.RandomHorizontalFlip(p=0.05),
@@ -19,7 +19,7 @@ def get_data_loaders(cfg):
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
     ])
 
-    # Val/Test transform — clean
+    # Val/Test transform
     eval_transform = transforms.Compose([
         transforms.Resize((224, 224)),
         transforms.ToTensor(),
@@ -38,14 +38,14 @@ def get_data_loaders(cfg):
 
     # Instantiate Datasets
     if task == "scene":
-        train_ds = VolleyballSceneDataset(videos_dir, tracks_dir, "train", mode=mode, transform=transform)
-        val_ds = VolleyballSceneDataset(videos_dir, tracks_dir, "val", mode=mode, transform=transform)
-        test_ds = VolleyballSceneDataset(videos_dir, tracks_dir, "test", mode=mode, transform=transform)
+        train_ds = VolleyballSceneDataset(videos_dir, tracks_dir, "train", mode=mode, transform=train_transform)
+        val_ds = VolleyballSceneDataset(videos_dir, tracks_dir, "val", mode=mode, transform=eval_transform)
+        test_ds = VolleyballSceneDataset(videos_dir, tracks_dir, "test", mode=mode, transform=eval_transform)
 
     elif task == "player":
-        train_ds = VolleyballPlayerDataset(videos_dir, tracks_dir, "train", mode=mode, transform=transform)
-        val_ds = VolleyballPlayerDataset(videos_dir, tracks_dir, "val", mode=mode, transform=transform)
-        test_ds = VolleyballPlayerDataset(videos_dir, tracks_dir, "test", mode=mode, transform=transform)
+        train_ds = VolleyballPlayerDataset(videos_dir, tracks_dir, "train", mode=mode, transform=train_transform)
+        val_ds = VolleyballPlayerDataset(videos_dir, tracks_dir, "val", mode=mode, transform=eval_transform)
+        test_ds = VolleyballPlayerDataset(videos_dir, tracks_dir, "test", mode=mode, transform=eval_transform)
 
     else:
         raise ValueError(f"Unknown task_type: {task!r}. Expected 'scene' or 'player'.")
