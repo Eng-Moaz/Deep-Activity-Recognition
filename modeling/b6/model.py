@@ -31,11 +31,11 @@ class Baseline6(nn.Module):
 
         # fc layer
         self.fc = nn.Sequential(
-            nn.Linear(cfg.hidden_size, 512),
-            nn.BatchNorm1d(512),
+            nn.Linear(cfg.hidden_size, 128),
+            nn.BatchNorm1d(128),
             nn.ReLU(),
             nn.Dropout(p=cfg.dropout),
-            nn.Linear(512, cfg.num_classes),
+            nn.Linear(128, cfg.num_classes),
         )
 
     def forward(self, x):
