@@ -41,6 +41,40 @@ def test_b5_config_imports():
     assert cfg2.input_mode == "scenecrops_temporal"
 
 
+def test_b6_config_imports():
+    from modeling.b6.config import Config
+    cfg = Config()
+    assert cfg.task_type == "scene"
+    assert cfg.input_mode == "scenecrops_temporal"
+    assert cfg.num_classes == 8
+    assert cfg.num_classes_stg1 == 9
+    assert cfg.hidden_size == 256
+    assert hasattr(cfg, "saved_resnet50_path")
+
+
+def test_b6_model_builds(tmp_path):
+    import torch
+    from modeling.b3.model import Baseline3_stg1
+    from modeling.b6.config import Config
+    from modeling.b6.model import Baseline6
+
+    # Create a temporary B3 Stage 1 checkpoint so Baseline6 can load it
+    stg1_cfg = type('Cfg', (), {'num_classes': 9, 'dropout': 0.5})()
+    stg1_model = Baseline3_stg1(stg1_cfg)
+    ckpt_path = str(tmp_path / "b3_stg1.pth")
+    torch.save(stg1_model.state_dict(), ckpt_path)
+
+    cfg = Config(saved_resnet50_path=ckpt_path)
+    model = Baseline6(cfg)
+    model.eval()
+
+    # Dummy input: (batch=2, seq=9, players=12, C=3, H=224, W=224)
+    x = torch.randn(2, 9, 12, 3, 224, 224)
+    with torch.no_grad():
+        out = model(x)
+    assert out.shape == (2, 8)
+
+
 def test_b1_model_builds():
     from modeling.b1.config import Config
     from modeling.b1.model import Baseline1

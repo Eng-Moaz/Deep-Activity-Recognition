@@ -1,0 +1,42 @@
+{
+  "timestamp": "2026-02-15T05:35:28.250983+00:00",
+  "git_sha": "fdab379",
+  "config": {
+    "experiment_name": "baseline5_stage2",
+    "device": "cuda",
+    "num_workers": 4,
+    "task_type": "scene",
+    "input_mode": "scenecrops_temporal",
+    "videos_dir": "/kaggle/input/datasets/ahmedmohamed365/volleyball/volleyball_/videos",
+    "tracks_dir": "/kaggle/input/datasets/ahmedmohamed365/volleyball/volleyball_tracking_annotation/volleyball_tracking_annotation",
+    "epochs": 12,
+    "batch_size": 4,
+    "learning_rate": 0.0005,
+    "weight_decay": 0.001,
+    "optimizer": "AdamW",
+    "use_amp": true,
+    "patience": 5,
+    "num_classes": 8,
+    "hidden_size": 256,
+    "lstm_layers": 1,
+    "dropout": 0.5,
+    "class_names": [
+      "l_pass",
+      "r_pass",
+      "l_spike",
+      "r_spike",
+      "l_set",
+      "r_set",
+      "l_winpoint",
+      "r_winpoint"
+    ],
+    "use_scheduler": true,
+    "step_size": 10,
+    "gamma": 0.1,
+    "seed": 42,
+    "model_save_path": "checkpoints/b5/best_model_b5_stg2.pth",
+    "cm_save_path": "checkpoints/b5/confusion_matrix_b5_stg2.png",
+    "num_classes_stg1": 9,
+    "saved_stg1_path": "checkpoints/b5/best_model_b5_stg1.pth"
+  }
+}
