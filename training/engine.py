@@ -92,6 +92,14 @@ def _build_optimizer(cfg, parameters):
 def _build_scheduler(cfg, optimizer):
     if not getattr(cfg, "use_scheduler", False):
         return None
+    scheduler_type = getattr(cfg, "scheduler_type", "StepLR")
+    if scheduler_type == "ReduceLROnPlateau":
+        return optim.lr_scheduler.ReduceLROnPlateau(
+            optimizer,
+            mode="min",
+            factor=getattr(cfg, "gamma", 0.1),
+            patience=getattr(cfg, "scheduler_patience", 2),
+        )
     return optim.lr_scheduler.StepLR(
         optimizer,
         step_size=cfg.step_size,
@@ -166,7 +174,10 @@ def run_training(cfg, model, train_loader, val_loader, test_loader, device):
             break
 
         if scheduler is not None:
-            scheduler.step()
+            if isinstance(scheduler, optim.lr_scheduler.ReduceLROnPlateau):
+                scheduler.step(val_loss)
+            else:
+                scheduler.step()
 
     # Final Evaluation
     print("\nEvaluating Best Model on Test Set...")

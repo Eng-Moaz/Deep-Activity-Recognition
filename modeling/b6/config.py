@@ -27,13 +27,13 @@ class Config:
     )
 
     # Training
-    epochs: int = 12
+    epochs: int = 20
     batch_size: int = 4
     learning_rate: float = 5e-4
     weight_decay: float = 0.001
     optimizer: str = "AdamW"
     use_amp: bool = True
-    patience: int = 5
+    patience: int = 10
 
     # Model
     num_classes: int = 8
@@ -51,7 +51,8 @@ class Config:
 
     # Scheduler
     use_scheduler: bool = True
-    step_size: int = 10
+    scheduler_type: str = "ReduceLROnPlateau"
+    scheduler_patience: int = 2
     gamma: float = 0.1
 
     # Reproducibility
