@@ -31,7 +31,7 @@ class Config_stg1:
     epochs: int = 10
     batch_size: int = 128
     learning_rate: float = 1e-4
-    weight_decay: float = 0.01
+    weight_decay: float = 0.001
     optimizer: str = "AdamW"
     use_amp: bool = True
     patience: int = 5

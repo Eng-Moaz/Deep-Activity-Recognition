@@ -38,11 +38,11 @@ class Config:
 
     # Training
     batch_size: int = 64
-    learning_rate: float = 1e-4
+    learning_rate: float = 1e-3
     dropout: float = 0.6
     optimizer: str = "AdamW"
-    weight_decay: float = 0.01
-    epochs: int = 10
+    weight_decay: float = 0.0001
+    epochs: int = 15
     use_amp: bool = True
     patience: int = 5
     label_smoothing: float = 0.1
