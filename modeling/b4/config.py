@@ -17,7 +17,7 @@ class Config:
     task_type: str = "scene"
     input_mode: str = "scenefull_temporal"     # Sequence of 9 frames
 
-    # Paths — portable via env vars, Kaggle defaults
+    # Paths
     videos_dir: str = os.environ.get(
         "VOLLEYBALL_VIDEOS_DIR",
         "/kaggle/input/datasets/ahmedmohamed365/volleyball/volleyball_/videos",
@@ -28,7 +28,7 @@ class Config:
     )
 
     # Training
-    epochs: int = 35
+    epochs: int = 20
     batch_size: int = 16
     learning_rate: float = 1e-4
     weight_decay: float = 0.001

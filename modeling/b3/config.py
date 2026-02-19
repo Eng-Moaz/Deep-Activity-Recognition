@@ -28,7 +28,7 @@ class Config_stg1:
     )
 
     # Training
-    epochs: int = 5
+    epochs: int = 10
     batch_size: int = 128
     learning_rate: float = 1e-4
     weight_decay: float = 0.001

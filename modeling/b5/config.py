@@ -71,7 +71,7 @@ class Config_stg2(Config_stg1):
     input_mode: str = "scenecrops_temporal"
 
     # Training
-    epochs: int = 35
+    epochs: int = 20
     batch_size: int = 8
     learning_rate: float = 1e-4
     patience: int = 10

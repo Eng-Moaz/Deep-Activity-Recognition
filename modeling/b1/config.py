@@ -42,7 +42,7 @@ class Config:
     dropout: float = 0.6
     optimizer: str = "AdamW"
     weight_decay: float = 0.0001
-    epochs: int = 5
+    epochs: int = 10
     use_amp: bool = True
     patience: int = 5
     label_smoothing: float = 0.1
