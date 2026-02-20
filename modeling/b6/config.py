@@ -40,7 +40,7 @@ class Config:
     # Model
     num_classes: int = 8
     num_classes_stg1: int = 9   # needed to reconstruct B3 Stage 1 for weight loading
-    hidden_size: int = 512
+    hidden_size: int = 1024
     lstm_layers: int = 1
     dropout: float = 0.5
 
