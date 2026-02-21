@@ -10,7 +10,7 @@ class Config_stg1:
 
     # System
     device: str = "cuda"
-    num_workers: int = 4
+    num_workers: int = 8
 
     # Data
     data_root: str = "/kaggle/input/volleyball/volleyball_"

@@ -10,7 +10,7 @@ class Config:
 
     # System
     device: str = "cuda"
-    num_workers: int = 4
+    num_workers: int = 8
 
     # Data uses scenecrops_temporal: (9 frames x 12 player crops)
     task_type: str = "scene"
