@@ -10,7 +10,7 @@ class Config:
 
     # System
     device: str = "cuda"
-    num_workers: int = 8
+    num_workers: int = 12
 
     # Data — uses scenecrops_temporal: (9 frames x 12 player crops)
     task_type: str = "scene"
@@ -28,7 +28,7 @@ class Config:
 
     # Training
     epochs: int = 20
-    batch_size: int = 8
+    batch_size: int = 16
     learning_rate: float = 1e-4
     weight_decay: float = 0.001
     optimizer: str = "AdamW"
