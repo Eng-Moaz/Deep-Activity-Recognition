@@ -72,7 +72,7 @@ class Config_stg2(Config_stg1):
 
     # Training
     epochs: int = 20
-    batch_size: int = 8
+    batch_size: int = 32
     learning_rate: float = 1e-4
     patience: int = 10
     label_smoothing: float = 0.1
