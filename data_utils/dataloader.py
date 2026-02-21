@@ -54,17 +54,21 @@ def get_data_loaders(cfg):
     # Create Loaders
     pin = num_workers > 0
     persist = num_workers > 0
+    prefetch = 4 if num_workers > 0 else None
     train_loader = DataLoader(
         train_ds, batch_size=batch_size, shuffle=True,
         num_workers=num_workers, pin_memory=pin, persistent_workers=persist,
+        prefetch_factor=prefetch,
     )
     val_loader = DataLoader(
         val_ds, batch_size=batch_size, shuffle=False,
         num_workers=num_workers, pin_memory=pin, persistent_workers=persist,
+        prefetch_factor=prefetch,
     )
     test_loader = DataLoader(
         test_ds, batch_size=batch_size, shuffle=False,
         num_workers=num_workers, pin_memory=pin, persistent_workers=persist,
+        prefetch_factor=prefetch,
     )
 
     return train_loader, val_loader, test_loader
