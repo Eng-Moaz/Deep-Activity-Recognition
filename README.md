@@ -13,7 +13,8 @@ Deep-Activity-Recognition/
 │   ├── b3/                 # Baseline 3: Two-stage spatial (player → scene)
 │   ├── b4/                 # Baseline 4: Temporal scene (ResNet-50 + LSTM)
 │   ├── b5/                 # Baseline 5: Temporal two-stage (player LSTM → pool → scene)
-│   └── b6/                 # Baseline 6: Pool players → LSTM temporal (scene)
+│   ├── b6/                 # Baseline 6: Pool players → LSTM temporal (scene)
+│   └── b7/                 # Baseline 7: Player LSTM → Pool → LSTM temporal (full model)
 ├── data_utils/
 │   ├── dataset.py          # VolleyballSceneDataset, VolleyballPlayerDataset
 │   └── dataloader.py       # Factory: routes config → correct dataset
@@ -39,6 +40,7 @@ Deep-Activity-Recognition/
 | **B5 Stg1** | ResNet → LSTM per player → FC | `temporal` | `(B, 9, 3, 224, 224)` | Player |
 | **B5 Stg2** | Frozen ResNet+LSTM per player → Concat → Pool → FC | `scenecrops_temporal` | `(B, 9, 12, 3, 224, 224)` | Scene |
 | **B6** | Frozen ResNet → Pool players → LSTM → FC | `scenecrops_temporal` | `(B, 9, 12, 3, 224, 224)` | Scene |
+| **B7** | Frozen ResNet+LSTM per player → Pool → LSTM_2 → FC | `scenecrops_temporal` | `(B, 9, 12, 3, 224, 224)` | Scene |
 
 ---
 
@@ -72,6 +74,9 @@ python -m modeling.b5.train --stage 2    # group activity (loads Stage 1)
 
 # Baseline 6 — Pool → LSTM temporal (requires B3 Stage 1 checkpoint)
 python -m modeling.b6.train
+
+# Baseline 7 — Full model: Player LSTM → Pool → LSTM_2 (requires B5 Stage 1 checkpoint)
+python -m modeling.b7.train
 ```
 
 ### Training Order
@@ -83,6 +88,7 @@ B1 ─────────────────────────�
 B3 Stage 1 ──► B3 Stage 2
               └──────────────► B6 (loads B3 Stage 1 checkpoint)
 B5 Stage 1 ──► B5 Stage 2
+              └──────────────► B7 (loads B5 Stage 1 checkpoint)
 ```
 
 ### 3. Path Configuration
@@ -107,7 +113,7 @@ Or edit `videos_dir` / `tracks_dir` directly in each baseline's `config.py`.
 | `scenecrops` | `(12, 3, 224, 224)` — 12 player crops | B3 Stage 2 |
 | `scenefull_temporal` | `(9, 3, 224, 224)` — 9-frame sequence | B4 |
 | `temporal` | `(9, 3, 224, 224)` — 9-frame player sequence | B5 Stage 1 |
-| `scenecrops_temporal` | `(9, 12, 3, 224, 224)` — 9 frames × 12 crops | B5 Stage 2, B6 |
+| `scenecrops_temporal` | `(9, 12, 3, 224, 224)` — 9 frames × 12 crops | B5 Stage 2, B6, B7 |
 
 ---
 
@@ -121,7 +127,7 @@ Each baseline has a `config.py` dataclass. All models take `cfg` as their only c
 | `input_mode` | Dataset mode (see table above) |
 | `num_classes` | 8 (scene) or 9 (player actions) |
 | `hidden_size` | LSTM hidden dimension (B4, B5, B6) |
-| `lstm_layers` | Number of LSTM layers (B4, B5, B6) |
+| `lstm_layers` | Number of LSTM layers (B4, B5, B6, B7) |
 | `seed` | Random seed for reproducibility |
 | `model_save_path` | Where to save the best checkpoint |
 

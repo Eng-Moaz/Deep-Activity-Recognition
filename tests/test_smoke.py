@@ -135,3 +135,40 @@ def test_dataset_imports():
     from data_utils.dataset import VolleyballSceneDataset, VolleyballPlayerDataset
     assert VolleyballSceneDataset is not None
     assert VolleyballPlayerDataset is not None
+
+
+def test_b7_config_imports():
+    from modeling.b7.config import Config
+    cfg = Config()
+    assert cfg.task_type == "scene"
+    assert cfg.input_mode == "scenecrops_temporal"
+    assert cfg.num_classes == 8
+    assert cfg.num_classes_stg1 == 9
+    assert cfg.hidden_size == 512
+    assert cfg.hidden_size_stg1 == 128
+    assert hasattr(cfg, "saved_stg1_path")
+
+
+def test_b7_model_builds(tmp_path):
+    import torch
+    from modeling.b5.model import Baseline5_stg1
+    from modeling.b7.config import Config
+    from modeling.b7.model import Baseline7
+
+    # Create a temporary B5 Stage 1 checkpoint so Baseline7 can load it
+    stg1_cfg = type('Cfg', (), {
+        'num_classes': 9, 'hidden_size': 128, 'lstm_layers': 1, 'dropout': 0.5,
+    })()
+    stg1_model = Baseline5_stg1(stg1_cfg)
+    ckpt_path = str(tmp_path / "b5_stg1.pth")
+    torch.save(stg1_model.state_dict(), ckpt_path)
+
+    cfg = Config(saved_stg1_path=ckpt_path)
+    model = Baseline7(cfg)
+    model.eval()
+
+    # Dummy input: (batch=2, seq=9, players=12, C=3, H=224, W=224)
+    x = torch.randn(2, 9, 12, 3, 224, 224)
+    with torch.no_grad():
+        out = model(x)
+    assert out.shape == (2, 8)
