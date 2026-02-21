@@ -10,7 +10,7 @@ class Config_stg1:
 
     # System
     device: str = "cuda"
-    num_workers: int = 4
+    num_workers: int = 12
 
     # Data — uses player temporal sequences (9 frames per player)
     task_type: str = "player"
@@ -70,18 +70,19 @@ class Config_stg2(Config_stg1):
     task_type: str = "scene"
     input_mode: str = "scenecrops_temporal"
 
-    # Training
-    epochs: int = 20
-    batch_size: int = 32
+    # Training (matched to reference repo)
+    epochs: int = 35
+    batch_size: int = 8
     learning_rate: float = 1e-4
-    patience: int = 10
-    label_smoothing: float = 0.1
-    scheduler_type: str = "ReduceLROnPlateau"
-    scheduler_patience: int = 2
+    weight_decay: float = 1.0
+    patience: int = 15
+    label_smoothing: float = 0.0
+    use_scheduler: bool = False
 
     # Model
     num_classes: int = 8
-    num_classes_stg1: int = 9  # needed to load Stage 1 checkpoint
+    num_classes_stg1: int = 9 
+    hidden_size_stg1: int = 128  
     class_names: List[str] = field(default_factory=lambda: [
         'l_pass', 'r_pass',
         'l_spike', 'r_spike',

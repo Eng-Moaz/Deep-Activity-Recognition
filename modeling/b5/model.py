@@ -41,9 +41,10 @@ class Baseline5_stg2(nn.Module):
         super().__init__()
 
         # Load full Stage 1 and freeze backbone + LSTM
+        stg1_hidden = getattr(cfg, 'hidden_size_stg1', cfg.hidden_size)
         stg1_cfg = type('Cfg', (), {
             'num_classes': cfg.num_classes_stg1,
-            'hidden_size': cfg.hidden_size,
+            'hidden_size': stg1_hidden,
             'lstm_layers': cfg.lstm_layers,
             'dropout': cfg.dropout,
         })()
@@ -60,8 +61,9 @@ class Baseline5_stg2(nn.Module):
             param.requires_grad = False
 
         # Group classifier (operates on pooled LSTM features)
+        fc_in = stg1_hidden + 2048
         self.fc = nn.Sequential(
-            nn.Linear(cfg.hidden_size + 2048, 512),
+            nn.Linear(fc_in, 512),
             nn.BatchNorm1d(512),
             nn.ReLU(),
             nn.Dropout(p=cfg.dropout),
