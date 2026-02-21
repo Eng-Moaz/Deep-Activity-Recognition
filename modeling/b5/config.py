@@ -10,7 +10,7 @@ class Config_stg1:
 
     # System
     device: str = "cuda"
-    num_workers: int = 8
+    num_workers: int = 12
 
     # Data — uses player temporal sequences (9 frames per player)
     task_type: str = "player"
