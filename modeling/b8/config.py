@@ -27,7 +27,7 @@ class Config:
     weight_decay: float = 0.01
     optimizer: str = "AdamW"
     use_amp: bool = False
-    patience: int = 10
+    patience: int = 15
     grad_clip_norm: float = 1.0
     label_smoothing: float = 0.1
 
