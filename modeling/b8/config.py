@@ -12,32 +12,29 @@ class Config:
     device: str = "cuda"
     num_workers: int = 4
 
-    # Data — uses pre-extracted player features: (9 frames x 12 players x 2048)
+    # Data — uses pre-extracted temporal features: (9 frames x 12 players x 3072)
     task_type: str = "features"
     input_mode: str = "features"
-    input_size: int = 2048
+    input_size: int = 3072  # 2048 CNN + 1024 LSTM
 
     # Feature paths
     features_dir: str = os.environ.get("VOLLEYBALL_FEATURES_DIR", "features")
 
     # Training
     epochs: int = 35
-    batch_size: int = 32
+    batch_size: int = 64
     learning_rate: float = 1e-4
-    weight_decay: float = 0.05
+    weight_decay: float = 0.01
     optimizer: str = "AdamW"
     use_amp: bool = False
     patience: int = 15
     grad_clip_norm: float = 1.0
-    label_smoothing: float = 0.1
+    label_smoothing: float = 0.0
 
     # Model
     num_classes: int = 8
-    hidden_size_player: int = 1024
-    hidden_size_frame: int = 1024
-    hidden_fc1: int = 512
-    hidden_fc2: int = 256
-    hidden_fc3: int = 128
+    hidden_size_frame: int = 2048
+    hidden_fc: int = 512
     dropout: float = 0.5
 
     class_names: List[str] = field(default_factory=lambda: [
@@ -47,16 +44,8 @@ class Config:
         'l_winpoint', 'r_winpoint',
     ])
 
-    # Class weights (inverse frequency, boosting winpoint classes)
-    class_weights: List[float] = field(default_factory=lambda: [
-        1.0, 1.0,   # l_pass, r_pass
-        1.0, 1.0,   # l_spike, r_spike
-        1.0, 1.0,   # l_set, r_set
-        2.0, 2.5,   # l_winpoint, r_winpoint
-    ])
-
     # Scheduler
-    use_scheduler: bool = True
+    use_scheduler: bool = False
     scheduler_type: str = "ReduceLROnPlateau"
     scheduler_patience: int = 3
     gamma: float = 0.1

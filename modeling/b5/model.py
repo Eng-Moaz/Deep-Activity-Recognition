@@ -40,18 +40,8 @@ class Baseline5_stg2(nn.Module):
     def __init__(self, cfg):
         super().__init__()
 
-        # LSTM per player over time
-        self.lstm = nn.LSTM(
-            input_size=cfg.input_size,
-            hidden_size=cfg.hidden_size,
-            num_layers=cfg.lstm_layers,
-            batch_first=True,
-        )
-
-        # Concat last ResNet feat + last LSTM hidden → classifier
-        fc_in = cfg.input_size + cfg.hidden_size
         self.fc = nn.Sequential(
-            nn.Linear(fc_in, 512),
+            nn.Linear(cfg.input_size, 512),
             nn.BatchNorm1d(512),
             nn.ReLU(),
             nn.Dropout(p=cfg.dropout),
@@ -59,22 +49,12 @@ class Baseline5_stg2(nn.Module):
         )
 
     def forward(self, x):
-        # x: (B, seq=9, players=12, feat=2048) — pre-extracted features
+        # x: (B, 9, 12, input_size)
         batch, seq, players, feat = x.shape
 
-        # 1. LSTM per player over time
-        x_p = x.permute(0, 2, 1, 3)                          # (B, 12, 9, 2048)
-        x_p = x_p.contiguous().view(batch * players, seq, feat)  # (B*12, 9, 2048)
-        lstm_out, _ = self.lstm(x_p)                          # (B*12, 9, hidden)
+        # Last timestep, pool over players
+        last = x[:, -1, :, :]                             # (B, 12, input_size)
+        pooled, _ = torch.max(last, dim=1)                # (B, input_size)
 
-        # Last frame features
-        last_resnet = x_p[:, -1, :]                           # (B*12, 2048)
-        last_lstm = lstm_out[:, -1, :]                        # (B*12, hidden)
-        combined = torch.cat([last_resnet, last_lstm], dim=1) # (B*12, 2048+hidden)
+        return self.fc(pooled)
 
-        # 2. Pool over players
-        combined = combined.view(batch, players, -1)          # (B, 12, 2048+hidden)
-        pooled, _ = torch.max(combined, dim=1)                # (B, 2048+hidden)
-
-        # 3. Classify
-        return self.fc(pooled)                                # (B, num_classes)

@@ -1,14 +1,18 @@
-"""Extract ResNet-50 features for downstream temporal baselines.
+"""Extract features for downstream temporal baselines.
 
-Two extraction modes:
-  - player:  (9, 12, 2048) per sample — for B6, B7 (player-level)
-  - frame:   (9, 2048)     per sample — for B4 (frame-level, no players)
+Three extraction modes:
+  - player:          (9, 12, 2048)              — ResNet features per player (B5 stg2, B6, B7)
+  - player_temporal:  (9, 12, 2048 + lstm_hidden) — ResNet + LSTM concat (B5 stg2, B6, B7, B8)
+  - frame:           (9, 2048)                   — ResNet features per frame (B4)
 
 Usage:
-    # Player-level features (for B6, B7) — uses B3 Stage 1 backbone
+    # Player-level ResNet features — uses B3 Stage 1 backbone
     python scripts/extract_features.py --mode player --checkpoint checkpoints/b3/best_model_b3_stg1.pth
 
-    # Frame-level features (for B4) — uses B1 backbone
+    # Player-level temporal features — uses B5 Stage 1 (backbone + LSTM)
+    python scripts/extract_features.py --mode player_temporal --checkpoint checkpoints/b5/best_model_b5_stg1.pth
+
+    # Frame-level features — uses B1 backbone
     python scripts/extract_features.py --mode frame --checkpoint checkpoints/b1/best_model.pth
 """
 
@@ -44,11 +48,35 @@ def build_feature_extractor(checkpoint_path, model_type, device):
     state_dict = torch.load(checkpoint_path, map_location="cpu")
     model.load_state_dict(state_dict)
 
-    # Strip FC head → pure ResNet backbone outputting (B, 2048, 1, 1)
+    # Strip FC head -> pure ResNet backbone outputting (B, 2048, 1, 1)
     backbone = nn.Sequential(*list(model.backbone.children())[:-1])
     backbone.eval()
     backbone.to(device)
     return backbone
+
+
+def build_temporal_extractor(checkpoint_path, device):
+    """Load a trained B5 Stage 1 model (backbone + LSTM) for temporal feature extraction."""
+    from modeling.b5.model import Baseline5_stg1
+    from modeling.b5.config import Config_stg1
+
+    cfg = Config_stg1()
+    model = Baseline5_stg1(cfg)
+
+    state_dict = torch.load(checkpoint_path, map_location="cpu")
+    model.load_state_dict(state_dict)
+    model.eval()
+    model.to(device)
+
+    # Strip the backbone down to feature extractor (no avgpool FC)
+    backbone = nn.Sequential(*list(model.backbone.children())[:-1])
+    backbone.eval()
+    backbone.to(device)
+
+    lstm = model.lstm
+    lstm.eval()
+
+    return backbone, lstm, cfg.hidden_size
 
 
 def extract_player_features(backbone, split, videos_dir, tracks_dir, device, batch_size_images=256):
@@ -93,6 +121,60 @@ def extract_player_features(backbone, split, videos_dir, tracks_dir, device, bat
     return all_features
 
 
+def extract_temporal_features(backbone, lstm, split, videos_dir, tracks_dir, device, batch_size_images=256):
+    """Extract ResNet + LSTM features: (9, 12, 2048 + lstm_hidden) per sample."""
+
+    eval_transform = transforms.Compose([
+        transforms.Resize((224, 224)),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+    ])
+
+    dataset = VolleyballSceneDataset(
+        videos_dir, tracks_dir, split,
+        mode="scenecrops_temporal",
+        transform=eval_transform,
+    )
+
+    loader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=0)
+
+    all_features = []
+    print(f"\n[{split.upper()}] Extracting temporal features from {len(dataset)} samples...")
+
+    for imgs, label in tqdm(loader, desc=f"  {split}"):
+        # imgs: (1, 9, 12, 3, 224, 224)
+        imgs = imgs.squeeze(0)  # (9, 12, 3, 224, 224)
+        seq_len, n_players, c, h, w = imgs.shape
+
+        # Extract ResNet features for all players across all frames
+        flat = imgs.view(seq_len * n_players, c, h, w)  # (108, 3, 224, 224)
+
+        feat_chunks = []
+        for i in range(0, flat.shape[0], batch_size_images):
+            chunk = flat[i : i + batch_size_images].to(device)
+            with torch.no_grad(), torch.amp.autocast("cuda"):
+                feat = backbone(chunk)
+            feat_chunks.append(feat.flatten(1).cpu())
+
+        cnn_features = torch.cat(feat_chunks, dim=0)  # (108, 2048)
+
+        # Run LSTM per player: reshape to (12, 9, 2048)
+        cnn_per_player = cnn_features.view(seq_len, n_players, -1)  # (9, 12, 2048)
+        cnn_per_player = cnn_per_player.permute(1, 0, 2)            # (12, 9, 2048)
+
+        with torch.no_grad():
+            lstm_out, _ = lstm(cnn_per_player.to(device))  # (12, 9, hidden)
+        lstm_out = lstm_out.cpu()
+
+        # Concatenate CNN + LSTM at each timestep: (12, 9, 2048 + hidden)
+        combined = torch.cat([cnn_per_player, lstm_out], dim=2)
+        combined = combined.permute(1, 0, 2)  # (9, 12, 2048 + hidden)
+
+        all_features.append((combined, label.item()))
+
+    return all_features
+
+
 def extract_frame_features(backbone, split, videos_dir, tracks_dir, device, batch_size_images=256):
     """Extract frame-level features: (9, 2048) per sample."""
 
@@ -127,17 +209,17 @@ def extract_frame_features(backbone, split, videos_dir, tracks_dir, device, batc
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Extract ResNet-50 features")
+    parser = argparse.ArgumentParser(description="Extract features for temporal baselines")
     parser.add_argument(
         "--mode",
-        choices=["player", "frame"],
+        choices=["player", "player_temporal", "frame"],
         default="player",
-        help="'player' → (9,12,2048) for B6/B7; 'frame' → (9,2048) for B4",
+        help="'player' (9,12,2048); 'player_temporal' (9,12,2048+H); 'frame' (9,2048)",
     )
     parser.add_argument(
         "--checkpoint",
         default="checkpoints/b3/best_model_b3_stg1.pth",
-        help="Path to trained checkpoint (B3 Stage 1 for player, B1 for frame)",
+        help="B3 stg1 for player, B5 stg1 for player_temporal, B1 for frame",
     )
     parser.add_argument(
         "--output_dir",
@@ -163,34 +245,44 @@ def main():
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Device: {device}")
     print(f"Mode: {args.mode}")
-    print(f"Loading backbone from: {args.checkpoint}")
-
-    # Determine model type from checkpoint path
-    model_type = "b1" if args.mode == "frame" else "b3"
-    backbone = build_feature_extractor(args.checkpoint, model_type, device)
+    print(f"Loading model from: {args.checkpoint}")
 
     os.makedirs(args.output_dir, exist_ok=True)
 
-    # Choose prefix based on mode
-    prefix = "frame" if args.mode == "frame" else ""
+    if args.mode == "player_temporal":
+        backbone, lstm, hidden_size = build_temporal_extractor(args.checkpoint, device)
+        feat_dim = 2048 + hidden_size
+        print(f"Temporal feature dim: {feat_dim} (2048 CNN + {hidden_size} LSTM)")
 
-    for split in ["train", "val", "test"]:
-        if args.mode == "player":
-            features = extract_player_features(
-                backbone, split, args.videos_dir, args.tracks_dir, device
+        for split in ["train", "val", "test"]:
+            features = extract_temporal_features(
+                backbone, lstm, split, args.videos_dir, args.tracks_dir, device
             )
-            filename = f"{split}_features.pt"
-        else:
-            features = extract_frame_features(
-                backbone, split, args.videos_dir, args.tracks_dir, device
-            )
-            filename = f"{split}_frame_features.pt"
+            filename = f"{split}_temporal_features.pt"
+            save_path = os.path.join(args.output_dir, filename)
+            torch.save(features, save_path)
+            print(f"  Saved {len(features)} samples -> {save_path}")
+    else:
+        model_type = "b1" if args.mode == "frame" else "b3"
+        backbone = build_feature_extractor(args.checkpoint, model_type, device)
 
-        save_path = os.path.join(args.output_dir, filename)
-        torch.save(features, save_path)
-        print(f"  Saved {len(features)} samples → {save_path}")
+        for split in ["train", "val", "test"]:
+            if args.mode == "player":
+                features = extract_player_features(
+                    backbone, split, args.videos_dir, args.tracks_dir, device
+                )
+                filename = f"{split}_features.pt"
+            else:
+                features = extract_frame_features(
+                    backbone, split, args.videos_dir, args.tracks_dir, device
+                )
+                filename = f"{split}_frame_features.pt"
 
-    print("\nDone! Features saved to:", args.output_dir)
+            save_path = os.path.join(args.output_dir, filename)
+            torch.save(features, save_path)
+            print(f"  Saved {len(features)} samples -> {save_path}")
+
+    print(f"\nDone! Features saved to: {args.output_dir}")
 
 
 if __name__ == "__main__":

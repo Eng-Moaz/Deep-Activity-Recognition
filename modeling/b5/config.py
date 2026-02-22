@@ -39,7 +39,7 @@ class Config_stg1:
 
     # Model
     num_classes: int = 9
-    hidden_size: int = 128
+    hidden_size: int = 1024
     lstm_layers: int = 1
     dropout: float = 0.5
 
@@ -73,7 +73,7 @@ class Config_stg2:
     # Data — uses pre-extracted player features: (9 frames x 12 players x 2048)
     task_type: str = "features"
     input_mode: str = "features"
-    input_size: int = 2048
+    input_size: int = 3072  # 2048 CNN + 1024 LSTM
 
     # Feature paths
     features_dir: str = os.environ.get("VOLLEYBALL_FEATURES_DIR", "features")

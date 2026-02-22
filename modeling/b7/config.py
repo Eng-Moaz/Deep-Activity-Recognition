@@ -15,7 +15,7 @@ class Config:
     # Data — uses pre-extracted features: (9 frames x 12 players x 2048)
     task_type: str = "features"
     input_mode: str = "features"
-    input_size: int = 2048
+    input_size: int = 3072  # 2048 CNN + 1024 LSTM
 
     # Feature paths
     features_dir: str = os.environ.get("VOLLEYBALL_FEATURES_DIR", "features")

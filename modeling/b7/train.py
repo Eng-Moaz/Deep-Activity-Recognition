@@ -20,9 +20,9 @@ def get_feature_loaders(cfg):
 
     print(f"Loading features from: {features_dir}")
 
-    train_ds = FeaturesDataset(os.path.join(features_dir, "train_features.pt"))
-    val_ds = FeaturesDataset(os.path.join(features_dir, "val_features.pt"))
-    test_ds = FeaturesDataset(os.path.join(features_dir, "test_features.pt"))
+    train_ds = FeaturesDataset(os.path.join(features_dir, "train_temporal_features.pt"))
+    val_ds = FeaturesDataset(os.path.join(features_dir, "val_temporal_features.pt"))
+    test_ds = FeaturesDataset(os.path.join(features_dir, "test_temporal_features.pt"))
 
     pin = num_workers > 0
     train_loader = DataLoader(
