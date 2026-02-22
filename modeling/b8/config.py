@@ -22,9 +22,9 @@ class Config:
 
     # Training
     epochs: int = 35
-    batch_size: int = 64
-    learning_rate: float = 2e-4
-    weight_decay: float = 0.01
+    batch_size: int = 32
+    learning_rate: float = 1e-4
+    weight_decay: float = 0.05
     optimizer: str = "AdamW"
     use_amp: bool = False
     patience: int = 15
@@ -47,12 +47,19 @@ class Config:
         'l_winpoint', 'r_winpoint',
     ])
 
+    # Class weights (inverse frequency, boosting winpoint classes)
+    class_weights: List[float] = field(default_factory=lambda: [
+        1.0, 1.0,   # l_pass, r_pass
+        1.0, 1.0,   # l_spike, r_spike
+        1.0, 1.0,   # l_set, r_set
+        2.0, 2.5,   # l_winpoint, r_winpoint
+    ])
+
     # Scheduler
     use_scheduler: bool = True
-    scheduler_type: str = "CosineAnnealingLR"
+    scheduler_type: str = "ReduceLROnPlateau"
     scheduler_patience: int = 3
     gamma: float = 0.1
-    min_lr: float = 1e-6
 
     # Reproducibility
     seed: int = 42
