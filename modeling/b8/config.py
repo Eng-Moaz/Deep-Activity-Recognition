@@ -21,9 +21,9 @@ class Config:
     features_dir: str = os.environ.get("VOLLEYBALL_FEATURES_DIR", "features")
 
     # Training
-    epochs: int = 25
+    epochs: int = 35
     batch_size: int = 64
-    learning_rate: float = 1e-4
+    learning_rate: float = 4e-4
     weight_decay: float = 0.01
     optimizer: str = "AdamW"
     use_amp: bool = False
