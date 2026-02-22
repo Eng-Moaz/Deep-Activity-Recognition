@@ -210,3 +210,17 @@ def test_b7_model_builds():
 def test_features_dataset_imports():
     from data_utils.dataset import FeaturesDataset
     assert FeaturesDataset is not None
+def test_b8_model_builds():
+    import torch
+    from modeling.b8.config import Config
+    from modeling.b8.model import Baseline8
+
+    cfg = Config()
+    model = Baseline8(cfg)
+    model.eval()
+
+    # Dummy input: (batch=2, seq=9, players=12, features=2048)
+    x = torch.randn(2, 9, 12, 2048)
+    with torch.no_grad():
+        out = model(x)
+    assert out.shape == (2, 8)

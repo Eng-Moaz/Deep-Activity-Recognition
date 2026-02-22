@@ -35,6 +35,9 @@ class Config:
     num_classes: int = 8
     hidden_size_player: int = 1024
     hidden_size_frame: int = 1024
+    hidden_fc1: int = 512
+    hidden_fc2: int = 256
+    hidden_fc3: int = 128
     dropout: float = 0.5
 
     class_names: List[str] = field(default_factory=lambda: [
