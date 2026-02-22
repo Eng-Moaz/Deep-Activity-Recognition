@@ -64,7 +64,7 @@ class Baseline7(nn.Module):
         x = x.permute(0, 2, 1, 3)                           # (B, 12, 9, 2048)
         x = x.contiguous().view(batch * players, seq, feat)  # (B*12, 9, 2048)
         lstm_out, _ = self.lstm(x)                           # (B*12, 9, hidden*2)
-        x = lstm_out[:, -1, :]                               # (B*12, hidden*2)
+        x = lstm_out.mean(dim=1)                             # (B*12, hidden*2)  — mean over time
 
         # 2. Attention pool over players
         x = x.view(batch, players, -1)                       # (B, 12, hidden*2)

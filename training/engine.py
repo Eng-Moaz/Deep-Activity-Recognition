@@ -105,6 +105,12 @@ def _build_scheduler(cfg, optimizer):
             factor=getattr(cfg, "gamma", 0.1),
             patience=getattr(cfg, "scheduler_patience", 2),
         )
+    elif scheduler_type == "CosineAnnealingLR":
+        return optim.lr_scheduler.CosineAnnealingLR(
+            optimizer,
+            T_max=getattr(cfg, "epochs", 50),
+            eta_min=getattr(cfg, "min_lr", 1e-6),
+        )
     return optim.lr_scheduler.StepLR(
         optimizer,
         step_size=cfg.step_size,
@@ -129,7 +135,11 @@ def run_training(cfg, model, train_loader, val_loader, test_loader, device):
     optimizer = _build_optimizer(cfg, trainable_params)
     scheduler = _build_scheduler(cfg, optimizer)
     label_smoothing = getattr(cfg, "label_smoothing", 0.0)
-    criterion = nn.CrossEntropyLoss(label_smoothing=label_smoothing)
+    class_weights = getattr(cfg, "class_weights", None)
+    if class_weights is not None:
+        class_weights = torch.tensor(class_weights, dtype=torch.float32).to(device)
+        print(f"[INFO] Class Weights = {class_weights.tolist()}")
+    criterion = nn.CrossEntropyLoss(weight=class_weights, label_smoothing=label_smoothing)
     if label_smoothing > 0:
         print(f"[INFO] Label Smoothing = {label_smoothing}")
 
