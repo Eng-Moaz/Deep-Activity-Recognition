@@ -21,21 +21,23 @@ class Config:
     features_dir: str = os.environ.get("VOLLEYBALL_FEATURES_DIR", "features")
 
     # Training
-    epochs: int = 30
+    epochs: int = 50
     batch_size: int = 64
     learning_rate: float = 1e-4
     weight_decay: float = 0.01
     optimizer: str = "AdamW"
     use_amp: bool = False
-    patience: int = 10
+    patience: int = 12
     grad_clip_norm: float = 1.0
-    label_smoothing: float = 0.0
+    label_smoothing: float = 0.1
 
     # Model
     num_classes: int = 8
-    hidden_size: int = 1024
-    lstm_layers: int = 1
-    dropout: float = 0.5
+    hidden_size: int = 512
+    lstm_layers: int = 2
+    dropout: float = 0.6
+    feat_dropout: float = 0.2
+    lstm_dropout: float = 0.3
 
     class_names: List[str] = field(default_factory=lambda: [
         'l_pass', 'r_pass',

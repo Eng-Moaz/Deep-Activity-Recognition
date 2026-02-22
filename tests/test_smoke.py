@@ -186,7 +186,7 @@ def test_b7_config_imports():
     assert cfg.task_type == "features"
     assert cfg.input_mode == "features"
     assert cfg.num_classes == 8
-    assert cfg.hidden_size == 1024
+    assert cfg.hidden_size == 512
     assert cfg.input_size == 2048
     assert cfg.batch_size == 64
 
