@@ -23,11 +23,11 @@ class Config:
     # Training
     epochs: int = 35
     batch_size: int = 64
-    learning_rate: float = 4e-4
+    learning_rate: float = 3e-4
     weight_decay: float = 0.01
     optimizer: str = "AdamW"
     use_amp: bool = False
-    patience: int = 5
+    patience: int = 15
     grad_clip_norm: float = 1.0
     label_smoothing: float = 0.0
 
