@@ -27,22 +27,22 @@ class Config:
     )
 
     # Training
-    epochs: int = 20
-    batch_size: int = 16
-    learning_rate: float = 1e-4
-    weight_decay: float = 0.001
+    epochs: int = 40
+    batch_size: int = 8
+    learning_rate: float = 4e-4
+    weight_decay: float = 1.0
     optimizer: str = "AdamW"
     use_amp: bool = True
-    patience: int = 7
+    patience: int = 15
     grad_clip_norm: float = 1.0
-    label_smoothing: float = 0.0
+    label_smoothing: float = 0.1
 
     # Model
     num_classes: int = 8
     num_classes_stg1: int = 9   # needed to reconstruct B5 Stage 1 for weight loading
     hidden_size: int = 512      # LSTM_2 hidden dimension
     lstm_layers: int = 1        # LSTM_2 layers
-    hidden_size_stg1: int = 128 # must match B5 Stage 1's hidden_size
+    hidden_size_stg1: int = 128 # must match YOUR B5 Stage 1's hidden_size
     lstm_layers_stg1: int = 1   # must match B5 Stage 1's lstm_layers
     dropout: float = 0.5
 
@@ -54,10 +54,7 @@ class Config:
     ])
 
     # Scheduler
-    use_scheduler: bool = True
-    scheduler_type: str = "ReduceLROnPlateau"
-    scheduler_patience: int = 2
-    gamma: float = 0.1
+    use_scheduler: bool = False
 
     # Reproducibility
     seed: int = 42
