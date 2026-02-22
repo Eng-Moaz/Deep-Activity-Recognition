@@ -457,4 +457,4 @@ class FeaturesDataset(Dataset):
 
     def __getitem__(self, idx):
         features, label = self.data[idx]
-        return features, label
+        return features.float(), label
