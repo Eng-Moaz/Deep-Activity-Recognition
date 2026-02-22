@@ -6,41 +6,34 @@ from typing import List
 @dataclass
 class Config:
     # Experiment
-    experiment_name: str = "baseline4_temporal"
+    experiment_name: str = "baseline4"
 
     # System
     device: str = "cuda"
-    num_workers: int = 8
+    num_workers: int = 4
 
-    # Data
-    data_root: str = "/kaggle/input/volleyball/volleyball_"
-    task_type: str = "scene"
-    input_mode: str = "scenefull_temporal"     # Sequence of 9 frames
+    # Data — uses pre-extracted frame features: (9 frames x 2048)
+    task_type: str = "features"
+    input_mode: str = "features"
+    input_size: int = 2048
 
-    # Paths
-    videos_dir: str = os.environ.get(
-        "VOLLEYBALL_VIDEOS_DIR",
-        "/kaggle/input/datasets/ahmedmohamed365/volleyball/volleyball_/videos",
-    )
-    tracks_dir: str = os.environ.get(
-        "VOLLEYBALL_TRACKS_DIR",
-        "/kaggle/input/datasets/ahmedmohamed365/volleyball/volleyball_tracking_annotation/volleyball_tracking_annotation",
-    )
+    # Feature paths
+    features_dir: str = os.environ.get("VOLLEYBALL_FEATURES_DIR", "features")
 
     # Training
-    epochs: int = 20
-    batch_size: int = 32
+    epochs: int = 25
+    batch_size: int = 64
     learning_rate: float = 1e-4
-    weight_decay: float = 0.001
+    weight_decay: float = 0.01
     optimizer: str = "AdamW"
-    use_amp: bool = True
-    patience: int = 10
+    use_amp: bool = False
+    patience: int = 7
     grad_clip_norm: float = 1.0
-    label_smoothing: float = 0.15
+    label_smoothing: float = 0.0
 
-    # Model (LSTM Specifics)
+    # Model
     num_classes: int = 8
-    hidden_size: int = 512
+    hidden_size: int = 1024
     lstm_layers: int = 1
     dropout: float = 0.5
 
@@ -48,19 +41,18 @@ class Config:
         'l_pass', 'r_pass',
         'l_spike', 'r_spike',
         'l_set', 'r_set',
-        'l_winpoint', 'r_winpoint'
+        'l_winpoint', 'r_winpoint',
     ])
 
     # Scheduler
     use_scheduler: bool = True
     scheduler_type: str = "ReduceLROnPlateau"
-    scheduler_patience: int = 2
+    scheduler_patience: int = 3
     gamma: float = 0.1
 
     # Reproducibility
     seed: int = 42
 
     # Paths
-    trained_resnet_path: str = "checkpoints/b1/best_model.pth"
     model_save_path: str = "checkpoints/b4/best_model_b4.pth"
     cm_save_path: str = "checkpoints/b4/confusion_matrix_b4.png"

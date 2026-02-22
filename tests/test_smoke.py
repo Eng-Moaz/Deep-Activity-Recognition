@@ -27,8 +27,27 @@ def test_b3_config_imports():
 def test_b4_config_imports():
     from modeling.b4.config import Config
     cfg = Config()
-    assert cfg.task_type == "scene"
-    assert cfg.input_mode == "scenefull_temporal"
+    assert cfg.task_type == "features"
+    assert cfg.input_mode == "features"
+    assert cfg.hidden_size == 1024
+    assert cfg.input_size == 2048
+    assert cfg.batch_size == 64
+
+
+def test_b4_model_builds():
+    import torch
+    from modeling.b4.config import Config
+    from modeling.b4.model import Baseline4
+
+    cfg = Config()
+    model = Baseline4(cfg)
+    model.eval()
+
+    # Dummy input: (batch=2, seq=9, features=2048)
+    x = torch.randn(2, 9, 2048)
+    with torch.no_grad():
+        out = model(x)
+    assert out.shape == (2, 8)
 
 
 def test_b5_config_imports():
@@ -44,32 +63,25 @@ def test_b5_config_imports():
 def test_b6_config_imports():
     from modeling.b6.config import Config
     cfg = Config()
-    assert cfg.task_type == "scene"
-    assert cfg.input_mode == "scenecrops_temporal"
+    assert cfg.task_type == "features"
+    assert cfg.input_mode == "features"
     assert cfg.num_classes == 8
-    assert cfg.num_classes_stg1 == 9
-    assert cfg.hidden_size == 512
-    assert hasattr(cfg, "saved_resnet50_path")
+    assert cfg.hidden_size == 1024
+    assert cfg.input_size == 2048
+    assert cfg.batch_size == 64
 
 
-def test_b6_model_builds(tmp_path):
+def test_b6_model_builds():
     import torch
-    from modeling.b3.model import Baseline3_stg1
     from modeling.b6.config import Config
     from modeling.b6.model import Baseline6
 
-    # Create a temporary B3 Stage 1 checkpoint so Baseline6 can load it
-    stg1_cfg = type('Cfg', (), {'num_classes': 9, 'dropout': 0.5})()
-    stg1_model = Baseline3_stg1(stg1_cfg)
-    ckpt_path = str(tmp_path / "b3_stg1.pth")
-    torch.save(stg1_model.state_dict(), ckpt_path)
-
-    cfg = Config(saved_resnet50_path=ckpt_path)
+    cfg = Config()
     model = Baseline6(cfg)
     model.eval()
 
-    # Dummy input: (batch=2, seq=9, players=12, C=3, H=224, W=224)
-    x = torch.randn(2, 9, 12, 3, 224, 224)
+    # Dummy input: (batch=2, seq=9, players=12, features=2048)
+    x = torch.randn(2, 9, 12, 2048)
     with torch.no_grad():
         out = model(x)
     assert out.shape == (2, 8)
