@@ -439,3 +439,22 @@ class VolleyballPlayerDataset(Dataset):
 
     def __len__(self):
         return len(self.samples)
+
+
+class FeaturesDataset(Dataset):
+    """Dataset for pre-extracted features (.pt files).
+
+    Each .pt file contains a list of (features_tensor, label) tuples.
+    Features shape: (seq_len, num_players, feature_dim) e.g. (9, 12, 2048).
+    """
+
+    def __init__(self, features_path):
+        self.data = torch.load(features_path, weights_only=False)
+        print(f"  Loaded {len(self.data)} samples from {features_path}")
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        features, label = self.data[idx]
+        return features, label
