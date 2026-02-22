@@ -42,7 +42,9 @@ def get_feature_loaders(cfg):
 
 
 if __name__ == "__main__":
+    import torch
     cfg = Config()
+    device = torch.device(cfg.device if torch.cuda.is_available() else "cpu")
     train_loader, val_loader, test_loader = get_feature_loaders(cfg)
     model = Baseline4(cfg)
-    run_training(cfg, model, train_loader, val_loader, test_loader)
+    run_training(cfg, model, train_loader, val_loader, test_loader, device)
