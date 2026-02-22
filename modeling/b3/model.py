@@ -17,23 +17,13 @@ class Baseline3_stg1(nn.Module):
 class Baseline3_stg2(nn.Module):
     def __init__(self, cfg):
         super().__init__()
-        # Load the pre-trained Stage 1 model (needs stg1's num_classes to load weights)
-        stg1_cfg = type('Cfg', (), {'num_classes': cfg.num_classes_stg1, 'dropout': cfg.dropout})()
-        self.baseline3_stg1 = Baseline3_stg1(stg1_cfg)
-        state_dict = torch.load(cfg.saved_resnet50_path, map_location="cpu")
-        self.baseline3_stg1.load_state_dict(state_dict)
 
-        # Remove the last layer
-        full_resnet = self.baseline3_stg1.backbone
-        modules = list(full_resnet.children())[:-1]
-        self.backbone = nn.Sequential(*modules)
+        # Pool over players
+        self.pool = nn.AdaptiveMaxPool1d(1)
 
-        # Freeze the network
-        for param in self.backbone.parameters():
-            param.requires_grad = False
-
+        # FC classifier
         self.scene_fc = nn.Sequential(
-            nn.Linear(2048, 1024),
+            nn.Linear(cfg.input_size, 1024),
             nn.BatchNorm1d(1024),
             nn.ReLU(),
             nn.Dropout(p=cfg.dropout),
@@ -41,21 +31,17 @@ class Baseline3_stg2(nn.Module):
         )
 
     def forward(self, x):
-        # Merge batch_size and num_players
-        batch_size, num_players, ch, h, w = x.shape
-        spatial_input = x.view(batch_size * num_players, ch, h, w)  # (B, 12, 3, 224, 224) -> (B*12, 3, 224, 224)
+        # x: (B, seq=9, players=12, feat=2048) — pre-extracted features
+        batch, seq, players, feat = x.shape
 
-        # Backbone forward
-        features = self.backbone(spatial_input)  # [B*12, 2048, 1, 1]
-        features = features.flatten(1)  # (B*12 x 2048)
+        # 1. Pool over players per frame
+        x = x.view(batch * seq, players, feat)       # (B*9, 12, 2048)
+        x = x.permute(0, 2, 1)                       # (B*9, 2048, 12)
+        x = self.pool(x).squeeze(-1)                  # (B*9, 2048)
+        x = x.view(batch, seq, feat)                  # (B, 9, 2048)
 
-        # Reshape back to separate players
-        features = features.view(batch_size, num_players, -1)  # (B*12 x 2048) -> (B x 12 x 2048)
+        # 2. Pool over time (mean)
+        x = x.mean(dim=1)                             # (B, 2048)
 
-        # MaxPool across players
-        scene_features, _ = torch.max(features, dim=1)  # Take max across the 12 players -> (B x 2048)
-
-        # Classify the Scene
-        final_out = self.scene_fc(scene_features)
-
-        return final_out
+        # 3. Classify
+        return self.scene_fc(x)                       # (B, num_classes)

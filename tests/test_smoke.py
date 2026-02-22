@@ -20,8 +20,10 @@ def test_b3_config_imports():
     cfg2 = Config_stg2()
     assert cfg1.task_type == "player"
     assert cfg1.input_mode == "action_train"
-    assert cfg2.task_type == "scene"
-    assert cfg2.input_mode == "scenecrops"
+    assert cfg2.task_type == "features"
+    assert cfg2.input_mode == "features"
+    assert cfg2.input_size == 2048
+    assert cfg2.batch_size == 64
 
 
 def test_b4_config_imports():
@@ -56,8 +58,11 @@ def test_b5_config_imports():
     cfg2 = Config_stg2()
     assert cfg1.task_type == "player"
     assert cfg1.input_mode == "temporal"
-    assert cfg2.task_type == "scene"
-    assert cfg2.input_mode == "scenecrops_temporal"
+    assert cfg2.task_type == "features"
+    assert cfg2.input_mode == "features"
+    assert cfg2.input_size == 2048
+    assert cfg2.hidden_size == 1024
+    assert cfg2.batch_size == 64
 
 
 def test_b6_config_imports():
@@ -109,6 +114,32 @@ def test_b3_stg1_model_builds():
     with torch.no_grad():
         out = model(x)
     assert out.shape == (2, 9)
+
+
+def test_b3_stg2_model_builds():
+    from modeling.b3.config import Config_stg2
+    from modeling.b3.model import Baseline3_stg2
+    cfg = Config_stg2()
+    model = Baseline3_stg2(cfg)
+    model.eval()
+    # Dummy input: (batch=2, seq=9, players=12, features=2048)
+    x = torch.randn(2, 9, 12, 2048)
+    with torch.no_grad():
+        out = model(x)
+    assert out.shape == (2, 8)
+
+
+def test_b5_stg2_model_builds():
+    from modeling.b5.config import Config_stg2
+    from modeling.b5.model import Baseline5_stg2
+    cfg = Config_stg2()
+    model = Baseline5_stg2(cfg)
+    model.eval()
+    # Dummy input: (batch=2, seq=9, players=12, features=2048)
+    x = torch.randn(2, 9, 12, 2048)
+    with torch.no_grad():
+        out = model(x)
+    assert out.shape == (2, 8)
 
 
 def test_training_engine_imports():

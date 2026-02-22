@@ -40,28 +40,16 @@ class Baseline5_stg2(nn.Module):
     def __init__(self, cfg):
         super().__init__()
 
-        # Load full Stage 1 and freeze backbone + LSTM
-        stg1_hidden = getattr(cfg, 'hidden_size_stg1', cfg.hidden_size)
-        stg1_cfg = type('Cfg', (), {
-            'num_classes': cfg.num_classes_stg1,
-            'hidden_size': stg1_hidden,
-            'lstm_layers': cfg.lstm_layers,
-            'dropout': cfg.dropout,
-        })()
-        stage1 = Baseline5_stg1(stg1_cfg)
-        state_dict = torch.load(cfg.saved_stg1_path, map_location="cpu")
-        stage1.load_state_dict(state_dict)
+        # LSTM per player over time
+        self.lstm = nn.LSTM(
+            input_size=cfg.input_size,
+            hidden_size=cfg.hidden_size,
+            num_layers=cfg.lstm_layers,
+            batch_first=True,
+        )
 
-        self.backbone = stage1.backbone
-        self.lstm = stage1.lstm
-
-        for param in self.backbone.parameters():
-            param.requires_grad = False
-        for param in self.lstm.parameters():
-            param.requires_grad = False
-
-        # Group classifier (operates on pooled LSTM features)
-        fc_in = stg1_hidden + 2048
+        # Concat last ResNet feat + last LSTM hidden → classifier
+        fc_in = cfg.input_size + cfg.hidden_size
         self.fc = nn.Sequential(
             nn.Linear(fc_in, 512),
             nn.BatchNorm1d(512),
@@ -71,28 +59,22 @@ class Baseline5_stg2(nn.Module):
         )
 
     def forward(self, x):
-        # x: (B, Seq=9, Players=12, C, H, W) from scenecrops_temporal
-        b, seq, p, c, h, w = x.shape
+        # x: (B, seq=9, players=12, feat=2048) — pre-extracted features
+        batch, seq, players, feat = x.shape
 
-        # 1. CNN per player per frame (frozen)
-        x = x.view(b * seq * p, c, h, w)              # (B*9*12, 3, 224, 224)
-        with torch.no_grad():
-            resnet_features = self.backbone(x).flatten(1)            # (B*9*12, 2048)
+        # 1. LSTM per player over time
+        x_p = x.permute(0, 2, 1, 3)                          # (B, 12, 9, 2048)
+        x_p = x_p.contiguous().view(batch * players, seq, feat)  # (B*12, 9, 2048)
+        lstm_out, _ = self.lstm(x_p)                          # (B*12, 9, hidden)
 
-        # 2. LSTM per player over time (frozen)
-        lstm_in = resnet_features.view(b * p, seq, 2048)                  # (B*12, 9, 2048)
-        with torch.no_grad():
-            lstm_out, _ = self.lstm(lstm_in)                    # (B*12, 9, hidden_size)
+        # Last frame features
+        last_resnet = x_p[:, -1, :]                           # (B*12, 2048)
+        last_lstm = lstm_out[:, -1, :]                        # (B*12, hidden)
+        combined = torch.cat([last_resnet, last_lstm], dim=1) # (B*12, 2048+hidden)
 
-        last_frame_resnet = lstm_in[:, -1, :]  # (Batch*Players, 2048)
-        last_frame_lstm = lstm_out[:, -1, :] # (B*12, hidden_size)
+        # 2. Pool over players
+        combined = combined.view(batch, players, -1)          # (B, 12, 2048+hidden)
+        pooled, _ = torch.max(combined, dim=1)                # (B, 2048+hidden)
 
-        combined_features = torch.cat([last_frame_resnet, last_frame_lstm], dim=1)
-
-        # 3. Pool over players
-        combined_features = combined_features.view(b, p, -1)  # (Batch, 12, 2048+Hidden)
-        pooled_features, _ = torch.max(combined_features, dim=1) # (Batch, 2048+Hidden)
-
-        # 4. Classify group activity
-        x = self.fc(pooled_features) # (B, num_classes)
-        return x
+        # 3. Classify
+        return self.fc(pooled)                                # (B, num_classes)

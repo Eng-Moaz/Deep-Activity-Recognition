@@ -62,27 +62,39 @@ class Config_stg1:
 
 
 @dataclass
-class Config_stg2(Config_stg1):
+class Config_stg2:
     # Experiment
     experiment_name: str = "baseline5_stage2"
 
-    # Data — uses scenecrops_temporal: (9 frames x 12 player crops)
-    task_type: str = "scene"
-    input_mode: str = "scenecrops_temporal"
+    # System
+    device: str = "cuda"
+    num_workers: int = 4
 
-    # Training (matched to reference repo)
-    epochs: int = 35
-    batch_size: int = 8
+    # Data — uses pre-extracted player features: (9 frames x 12 players x 2048)
+    task_type: str = "features"
+    input_mode: str = "features"
+    input_size: int = 2048
+
+    # Feature paths
+    features_dir: str = os.environ.get("VOLLEYBALL_FEATURES_DIR", "features")
+
+    # Training
+    epochs: int = 30
+    batch_size: int = 64
     learning_rate: float = 1e-4
-    weight_decay: float = 1.0
-    patience: int = 15
+    weight_decay: float = 0.01
+    optimizer: str = "AdamW"
+    use_amp: bool = False
+    patience: int = 10
+    grad_clip_norm: float = 1.0
     label_smoothing: float = 0.0
-    use_scheduler: bool = False
 
     # Model
     num_classes: int = 8
-    num_classes_stg1: int = 9 
-    hidden_size_stg1: int = 128  
+    hidden_size: int = 1024
+    lstm_layers: int = 1
+    dropout: float = 0.5
+
     class_names: List[str] = field(default_factory=lambda: [
         'l_pass', 'r_pass',
         'l_spike', 'r_spike',
@@ -90,7 +102,15 @@ class Config_stg2(Config_stg1):
         'l_winpoint', 'r_winpoint',
     ])
 
+    # Scheduler
+    use_scheduler: bool = True
+    scheduler_type: str = "ReduceLROnPlateau"
+    scheduler_patience: int = 3
+    gamma: float = 0.1
+
+    # Reproducibility
+    seed: int = 42
+
     # Paths
-    saved_stg1_path: str = "checkpoints/b5/best_model_b5_stg1.pth"
     model_save_path: str = "checkpoints/b5/best_model_b5_stg2.pth"
     cm_save_path: str = "checkpoints/b5/confusion_matrix_b5_stg2.png"

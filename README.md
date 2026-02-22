@@ -38,10 +38,10 @@ Deep-Activity-Recognition/
 |----------|-------------|------------|------------|------|
 | **B1** | ResNet-50 → FC | `scenefull` | `(B, 3, 224, 224)` | Scene |
 | **B3 Stg1** | ResNet-50 → FC | `action_train` | `(B, 3, 224, 224)` | Player |
-| **B3 Stg2** | Frozen ResNet → Pool players → FC | `scenecrops` | `(B, 12, 3, 224, 224)` | Scene |
+| **B3 Stg2** | Pool players → Pool time → FC | `features` | `(B, 9, 12, 2048)` | Scene |
 | **B4** | LSTM frames → FC | `features` | `(B, 9, 2048)` | Scene |
 | **B5 Stg1** | ResNet → LSTM per player → FC | `temporal` | `(B, 9, 3, 224, 224)` | Player |
-| **B5 Stg2** | Frozen ResNet+LSTM per player → Concat → Pool → FC | `scenecrops_temporal` | `(B, 9, 12, 3, 224, 224)` | Scene |
+| **B5 Stg2** | LSTM per player → Concat → Pool → FC | `features` | `(B, 9, 12, 2048)` | Scene |
 | **B6** | Pool players → LSTM → FC | `features` | `(B, 9, 12, 2048)` | Scene |
 | **B7** | LSTM per player → Pool → FC | `features` | `(B, 9, 12, 2048)` | Scene |
 
@@ -66,16 +66,16 @@ python -m modeling.b1.train
 
 # Baseline 3 — Two-stage (run Stage 1 first)
 python -m modeling.b3.train --stage 1    # player action classification
-python -m modeling.b3.train --stage 2    # scene classification (loads Stage 1)
+python -m modeling.b3.train --stage 2    # scene on features (after extraction)
 
 # Baseline 5 — Temporal two-stage (run Stage 1 first)
 python -m modeling.b5.train --stage 1    # player temporal LSTM
-python -m modeling.b5.train --stage 2    # group activity (loads Stage 1)
+python -m modeling.b5.train --stage 2    # group activity on features (after extraction)
 
-# ---- Feature-based baselines (B4, B6, B7) ----
+# ---- Feature-based baselines (B3 Stg2, B4, B5 Stg2, B6, B7) ----
 # Step 1: Extract features (one-time per mode)
 python scripts/extract_features.py --mode frame --checkpoint checkpoints/b1/best_model.pth     # for B4
-python scripts/extract_features.py --mode player --checkpoint checkpoints/b3/best_model_b3_stg1.pth  # for B6, B7
+python scripts/extract_features.py --mode player --checkpoint checkpoints/b3/best_model_b3_stg1.pth  # for B3 Stg2, B5 Stg2, B6, B7
 
 # Step 2: Train (fast, batch_size=64)
 python -m modeling.b4.train    # frame features
@@ -89,9 +89,11 @@ Some baselines depend on checkpoints from earlier ones:
 
 ```
 B1 ──► Feature extraction (--mode frame) ──► B4
-B3 Stage 1 ──► B3 Stage 2
-              └──► Feature extraction (--mode player) ──► B6, B7
-B5 Stage 1 ──► B5 Stage 2
+B3 Stage 1 ──► Feature extraction (--mode player) ──► B3 Stage 2
+                                             ├──► B5 Stage 2
+                                             ├──► B6
+                                             └──► B7
+B5 Stage 1 (standalone, no dependencies)
 ```
 
 ### 3. Path Configuration
@@ -122,9 +124,9 @@ Or edit `videos_dir` / `tracks_dir` directly in each baseline's `config.py`.
 
 ---
 
-## Feature Extraction Workflow (B4, B6, B7)
+## Feature Extraction Workflow (B3 Stg2, B4, B5 Stg2, B6, B7)
 
-B4, B6, and B7 use **pre-extracted ResNet-50 features** instead of running the CNN in the training loop.
+B3 Stg2, B4, B5 Stg2, B6, and B7 use **pre-extracted ResNet-50 features** instead of running the CNN in the training loop.
 This enables `batch_size=64` and each model trains in minutes.
 
 ### Extract Features (one-time)
@@ -133,7 +135,7 @@ This enables `batch_size=64` and each model trains in minutes.
 # Frame-level features for B4 — uses B1 backbone
 python scripts/extract_features.py --mode frame --checkpoint checkpoints/b1/best_model.pth
 
-# Player-level features for B6, B7 — uses B3 Stage 1 backbone
+# Player-level features for B3 Stg2, B5 Stg2, B6, B7 — uses B3 Stage 1 backbone
 python scripts/extract_features.py --mode player --checkpoint checkpoints/b3/best_model_b3_stg1.pth
 ```
 
@@ -143,7 +145,7 @@ features/
 ├── train_frame_features.pt     # (9, 2048)         — for B4
 ├── val_frame_features.pt
 ├── test_frame_features.pt
-├── train_features.pt           # (9, 12, 2048)     — for B6, B7
+├── train_features.pt           # (9, 12, 2048)     — for B3 Stg2, B5 Stg2, B6, B7
 ├── val_features.pt
 └── test_features.pt
 ```
@@ -151,9 +153,11 @@ features/
 ### Train
 
 ```bash
-python -m modeling.b4.train     # LSTM on frame features
-python -m modeling.b6.train     # Pool players → LSTM
-python -m modeling.b7.train     # LSTM per player → Pool
+python -m modeling.b3.train --stage 2   # Pool players → Pool time → FC
+python -m modeling.b4.train             # LSTM on frame features
+python -m modeling.b5.train --stage 2   # LSTM per player → Concat → Pool → FC
+python -m modeling.b6.train             # Pool players → LSTM
+python -m modeling.b7.train             # LSTM per player → Pool
 ```
 
 ---
