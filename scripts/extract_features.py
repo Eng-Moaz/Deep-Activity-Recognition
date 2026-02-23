@@ -48,8 +48,13 @@ def build_feature_extractor(checkpoint_path, model_type, device):
     state_dict = torch.load(checkpoint_path, map_location="cpu")
     model.load_state_dict(state_dict)
 
-    # Strip FC head -> pure ResNet backbone outputting (B, 2048, 1, 1)
-    backbone = nn.Sequential(*list(model.backbone.children())[:-1])
+    # If the backbone is already stripped (Baseline 5 stg1), use it directly.
+    # Otherwise, strip the FC head.
+    if isinstance(model.backbone, nn.Sequential):
+        backbone = model.backbone
+    else:
+        backbone = nn.Sequential(*list(model.backbone.children())[:-1])
+    
     backbone.eval()
     backbone.to(device)
     return backbone
@@ -68,8 +73,8 @@ def build_temporal_extractor(checkpoint_path, device):
     model.eval()
     model.to(device)
 
-    # Strip the backbone down to feature extractor (no avgpool FC)
-    backbone = nn.Sequential(*list(model.backbone.children())[:-1])
+    # Baseline 5 stg1 backbone is already stripped to pure features
+    backbone = model.backbone
     backbone.eval()
     backbone.to(device)
 
