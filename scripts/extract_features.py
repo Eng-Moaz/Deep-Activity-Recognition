@@ -156,7 +156,7 @@ def extract_temporal_features(backbone, lstm, split, videos_dir, tracks_dir, dev
                 feat = backbone(chunk)
             feat_chunks.append(feat.flatten(1).cpu())
 
-        cnn_features = torch.cat(feat_chunks, dim=0)  # (108, 2048)
+        cnn_features = torch.cat(feat_chunks, dim=0).float()  # (108, 2048)
 
         # Run LSTM per player: reshape to (12, 9, 2048)
         cnn_per_player = cnn_features.view(seq_len, n_players, -1)  # (9, 12, 2048)
