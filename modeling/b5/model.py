@@ -16,6 +16,7 @@ class Baseline5_stg1(nn.Module):
             num_layers=cfg.lstm_layers,
             batch_first=True,
         )
+        self.lstm_norm = nn.LayerNorm(cfg.hidden_size)  # stable scale for stage-2 features
 
         self.fc = nn.Sequential(
             nn.Linear(cfg.hidden_size, 512),
@@ -31,6 +32,7 @@ class Baseline5_stg1(nn.Module):
         x = self.backbone(x).flatten(1)           # (B*9, 2048)
         x = x.view(b, seq, -1)                    # (B, 9, 2048)
         x, _ = self.lstm(x)                       # (B, 9, hidden_size)
+        x = self.lstm_norm(x)                     # stable scale for downstream
         x = x[:, -1, :]                           # (B, hidden_size)
         x = self.fc(x)                            # (B, num_classes)
         return x
