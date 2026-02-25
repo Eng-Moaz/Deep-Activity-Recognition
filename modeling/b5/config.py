@@ -41,7 +41,7 @@ class Config_stg1:
     num_classes: int = 9
     hidden_size: int = 1024
     lstm_layers: int = 1
-    dropout: float = 0.5
+    dropout: float = 0.55
 
     class_names: List[str] = field(default_factory=lambda: [
         'blocking', 'digging', 'falling', 'jumping',
@@ -70,10 +70,12 @@ class Config_stg2:
     device: str = "cuda"
     num_workers: int = 4
 
-    # Data — uses pre-extracted player features: (9 frames x 12 players x 2048)
+    # Data — uses pre-extracted player features: (9, 12, feat_dim)
     task_type: str = "features"
     input_mode: str = "features"
     input_size: int = 3072  # 2048 CNN + 1024 LSTM
+    # For diagnostic (stage-2 <75% with temporal): set input_size=2048, feature_file_stem="temporal_cnn_only"
+    feature_file_stem: str = "temporal_features"
 
     # Feature paths
     features_dir: str = os.environ.get("VOLLEYBALL_FEATURES_DIR", "features")

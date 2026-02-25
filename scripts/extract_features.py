@@ -2,7 +2,7 @@
 
 Three extraction modes:
   - player:          (9, 12, 2048)              — ResNet features per player (B5 stg2, B6, B7)
-  - player_temporal:  (9, 12, 2048 + lstm_hidden) — ResNet + LSTM concat (B5 stg2, B6, B7, B8)
+  - player_temporal: (9, 12, 2048 + lstm_hidden) — ResNet + LSTM concat (B5 stg2, B6, B7, B8)
   - frame:           (9, 2048)                   — ResNet features per frame (B4)
 
 Usage:
@@ -73,7 +73,6 @@ def build_temporal_extractor(checkpoint_path, device):
     model.eval()
     model.to(device)
 
-    # Baseline 5 stg1 backbone is already stripped to pure features
     backbone = model.backbone
     backbone.eval()
     backbone.to(device)
@@ -163,16 +162,22 @@ def extract_temporal_features(backbone, lstm, split, videos_dir, tracks_dir, dev
 
         cnn_features = torch.cat(feat_chunks, dim=0).float()  # (108, 2048)
 
-        # Run LSTM per player: reshape to (12, 9, 2048)
-        cnn_per_player = cnn_features.view(seq_len, n_players, -1)  # (9, 12, 2048)
-        cnn_per_player = cnn_per_player.permute(1, 0, 2)            # (12, 9, 2048)
+        # Reshape to (9, 12, 2048) - frames x players x features
+        cnn_reshaped = cnn_features.view(seq_len, n_players, -1)  # (9, 12, 2048)
+        
+        # For LSTM: need (batch=players, seq=frames, features) for batch_first=True
+        # Process all players together - each row is one player's 9-frame sequence
+        cnn_for_lstm = cnn_reshaped.permute(1, 0, 2)  # (12, 9, 2048)
 
         with torch.no_grad():
-            lstm_out, _ = lstm(cnn_per_player.to(device))  # (12, 9, hidden)
+            lstm_out, _ = lstm(cnn_for_lstm.to(device))  # (12, 9, hidden)
         lstm_out = lstm_out.cpu()
 
-        # Concatenate CNN + LSTM at each timestep: (12, 9, 2048 + hidden)
-        combined = torch.cat([cnn_per_player, lstm_out], dim=2)
+        # According to paper equation 7: P_tk = x_tk ⊕ h_tk
+        # Concatenate CNN feature with LSTM hidden state at each timestep
+        # Both tensors are (12, 9, ...), concatenate on feature dimension
+        combined = torch.cat([cnn_for_lstm, lstm_out], dim=2)  # (12, 9, 2048 + hidden)
+        
         combined = combined.permute(1, 0, 2)  # (9, 12, 2048 + hidden)
 
         all_features.append((combined, label.item()))
