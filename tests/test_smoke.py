@@ -60,7 +60,7 @@ def test_b5_config_imports():
     assert cfg1.input_mode == "temporal"
     assert cfg2.task_type == "features"
     assert cfg2.input_mode == "features"
-    assert cfg2.input_size == 2048
+    assert cfg2.input_size == 3072
     assert cfg2.hidden_size == 1024
     assert cfg2.batch_size == 64
 
@@ -135,8 +135,8 @@ def test_b5_stg2_model_builds():
     cfg = Config_stg2()
     model = Baseline5_stg2(cfg)
     model.eval()
-    # Dummy input: (batch=2, seq=9, players=12, features=2048)
-    x = torch.randn(2, 9, 12, 2048)
+    # Dummy input: (batch=2, seq=9, players=12, features=3072)
+    x = torch.randn(2, 9, 12, 3072)
     with torch.no_grad():
         out = model(x)
     assert out.shape == (2, 8)
@@ -187,7 +187,7 @@ def test_b7_config_imports():
     assert cfg.input_mode == "features"
     assert cfg.num_classes == 8
     assert cfg.hidden_size == 1024
-    assert cfg.input_size == 2048
+    assert cfg.input_size == 3072
     assert cfg.batch_size == 64
 
 
@@ -200,8 +200,8 @@ def test_b7_model_builds():
     model = Baseline7(cfg)
     model.eval()
 
-    # Dummy input: (batch=2, seq=9, players=12, features=2048)
-    x = torch.randn(2, 9, 12, 2048)
+    # Dummy input: (batch=2, seq=9, players=12, features=3072)
+    x = torch.randn(2, 9, 12, 3072)
     with torch.no_grad():
         out = model(x)
     assert out.shape == (2, 8)
@@ -219,8 +219,8 @@ def test_b8_model_builds():
     model = Baseline8(cfg)
     model.eval()
 
-    # Dummy input: (batch=2, seq=9, players=12, features=2048)
-    x = torch.randn(2, 9, 12, 2048)
+    # Dummy input: (batch=2, seq=9, players=12, features=3072)
+    x = torch.randn(2, 9, 12, 3072)
     with torch.no_grad():
         out = model(x)
     assert out.shape == (2, 8)

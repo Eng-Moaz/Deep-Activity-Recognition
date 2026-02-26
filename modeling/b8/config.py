@@ -16,6 +16,7 @@ class Config:
     task_type: str = "features"
     input_mode: str = "features"
     input_size: int = 3072  # 2048 CNN + 1024 LSTM
+    feature_file_stem: str = "temporal_features"
 
     # Feature paths
     features_dir: str = os.environ.get("VOLLEYBALL_FEATURES_DIR", "features")

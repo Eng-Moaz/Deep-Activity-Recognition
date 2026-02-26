@@ -20,7 +20,7 @@ class Baseline7(nn.Module):
 
         # Classifier
         self.classifier = nn.Sequential(
-            nn.Linear(cfg.hidden_size, 512),
+            nn.Linear(cfg.input_size + cfg.hidden_size, 512),
             nn.BatchNorm1d(512),
             nn.ReLU(),
             nn.Dropout(cfg.dropout),
@@ -39,6 +39,9 @@ class Baseline7(nn.Module):
 
         # Scene LSTM over temporal sequence
         lstm_out, _ = self.scene_lstm(x)             # (B, 9, hidden)
-        last_hidden = lstm_out[:, -1, :]             # (B, hidden)
+        
+        # Concatenate scene representations from CNN/LSTM1 and LSTM2 over time, take the last frame
+        x_concat = torch.cat([x, lstm_out], dim=2)   # (B, 9, input_size + hidden)
+        last_hidden = x_concat[:, -1, :]             # (B, input_size + hidden)
 
         return self.classifier(last_hidden)

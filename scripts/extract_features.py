@@ -14,6 +14,9 @@ Usage:
 
     # Frame-level features — uses B1 backbone
     python scripts/extract_features.py --mode frame --checkpoint checkpoints/b1/best_model.pth
+
+    # Player-level sequence features (spatial only) — uses B3 Stage 1 backbone (For Baseline 6)
+    python scripts/extract_features.py --mode spatial_sequence --checkpoint checkpoints/b3/best_model_b3_stg1.pth
 """
 
 import argparse
@@ -185,6 +188,49 @@ def extract_temporal_features(backbone, lstm, split, videos_dir, tracks_dir, dev
     return all_features
 
 
+def extract_spatial_sequence_features(backbone, split, videos_dir, tracks_dir, device, batch_size_images=256):
+    """Extract sequence of CNN features: (9, 12, 2048) per sample without any RNN attached."""
+
+    eval_transform = transforms.Compose([
+        transforms.Resize((224, 224)),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+    ])
+
+    dataset = VolleyballSceneDataset(
+        videos_dir, tracks_dir, split,
+        mode="scenecrops_temporal",
+        transform=eval_transform,
+    )
+
+    loader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=0)
+
+    all_features = []
+    print(f"\n[{split.upper()}] Extracting spatial sequence features from {len(dataset)} samples...")
+
+    for imgs, label in tqdm(loader, desc=f"  {split}"):
+        # imgs: (1, 9, 12, 3, 224, 224)
+        imgs = imgs.squeeze(0)  # (9, 12, 3, 224, 224)
+        seq_len, n_players, c, h, w = imgs.shape
+
+        flat = imgs.view(seq_len * n_players, c, h, w)  # (108, 3, 224, 224)
+
+        feat_chunks = []
+        for i in range(0, flat.shape[0], batch_size_images):
+            chunk = flat[i : i + batch_size_images].to(device)
+            with torch.no_grad(), torch.amp.autocast("cuda"):
+                feat = backbone(chunk)
+            feat_chunks.append(feat.flatten(1).cpu())
+
+        features = torch.cat(feat_chunks, dim=0)  # (108, 2048)
+        features = features.view(seq_len, n_players, 2048)  # (9, 12, 2048)
+
+        all_features.append((features, label.item()))
+
+    return all_features
+
+
+
 def extract_frame_features(backbone, split, videos_dir, tracks_dir, device, batch_size_images=256):
     """Extract frame-level features: (9, 2048) per sample."""
 
@@ -222,9 +268,9 @@ def main():
     parser = argparse.ArgumentParser(description="Extract features for temporal baselines")
     parser.add_argument(
         "--mode",
-        choices=["player", "player_temporal", "frame"],
+        choices=["player", "player_temporal", "frame", "spatial_sequence"],
         default="player",
-        help="'player' (9,12,2048); 'player_temporal' (9,12,2048+H); 'frame' (9,2048)",
+        help="'player' (9,12,2048); 'player_temporal' (9,12,2048+H); 'frame' (9,2048); 'spatial_sequence' (9, 12, 2048)",
     )
     parser.add_argument(
         "--checkpoint",
@@ -282,6 +328,11 @@ def main():
                     backbone, split, args.videos_dir, args.tracks_dir, device
                 )
                 filename = f"{split}_features.pt"
+            elif args.mode == "spatial_sequence":
+                features = extract_spatial_sequence_features(
+                    backbone, split, args.videos_dir, args.tracks_dir, device
+                )
+                filename = f"{split}_spatial_sequence_features.pt"
             else:
                 features = extract_frame_features(
                     backbone, split, args.videos_dir, args.tracks_dir, device

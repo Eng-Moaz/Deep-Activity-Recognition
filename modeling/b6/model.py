@@ -39,7 +39,9 @@ class Baseline6(nn.Module):
 
         # 2. LSTM over temporal sequence
         lstm_out, _ = self.lstm(x)                    # (B, 9, hidden)
+        
+        # 3. Take the last hidden state of the LSTM
         last_hidden = lstm_out[:, -1, :]              # (B, hidden)
 
-        # 3. Classify
+        # 4. Classify
         return self.fc(last_hidden)                   # (B, num_classes)
