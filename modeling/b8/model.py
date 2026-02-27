@@ -19,6 +19,7 @@ class Baseline8(nn.Module):
         )
 
         self.layer_norm = nn.LayerNorm(cfg.input_size * 2)
+        self.lstm_dropout = nn.Dropout(cfg.dropout)
 
         # Classifier
         self.classifier = nn.Sequential(
@@ -49,9 +50,11 @@ class Baseline8(nn.Module):
 
         # Scene LSTM over temporal sequence
         scene_out, _ = self.scene_lstm(scene_input)              # (B, 9, hidden_frame)
-        
-        # Concatenate scene representations from CNN/LSTM1 and LSTM2 over time, take the last frame
-        x_concat = torch.cat([scene_input, scene_out], dim=2)    # (B, 9, input_size*2 + hidden_frame)
-        final = x_concat[:, -1, :]                               # (B, input_size*2 + hidden_frame)
+        scene_out = self.lstm_dropout(scene_out)
 
-        return self.classifier(final)
+        # Temporal mean pooling over all timesteps
+        input_mean = scene_input.mean(dim=1)                     # (B, feat*2)
+        lstm_mean = scene_out.mean(dim=1)                        # (B, hidden_frame)
+        combined = torch.cat([input_mean, lstm_mean], dim=1)     # (B, feat*2 + hidden_frame)
+
+        return self.classifier(combined)

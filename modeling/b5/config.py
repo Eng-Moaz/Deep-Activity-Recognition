@@ -83,19 +83,19 @@ class Config_stg2:
     # Training
     epochs: int = 30
     batch_size: int = 64
-    learning_rate: float = 1e-4
-    weight_decay: float = 0.01
+    learning_rate: float = 5e-4
+    weight_decay: float = 0.05
     optimizer: str = "AdamW"
     use_amp: bool = False
     patience: int = 10
     grad_clip_norm: float = 1.0
-    label_smoothing: float = 0.0
+    label_smoothing: float = 0.1
 
     # Model
     num_classes: int = 8
     hidden_size: int = 1024
     lstm_layers: int = 1
-    dropout: float = 0.5
+    dropout: float = 0.7
 
     class_names: List[str] = field(default_factory=lambda: [
         'l_pass', 'r_pass',
@@ -106,9 +106,8 @@ class Config_stg2:
 
     # Scheduler
     use_scheduler: bool = True
-    scheduler_type: str = "ReduceLROnPlateau"
-    scheduler_patience: int = 3
-    gamma: float = 0.1
+    scheduler_type: str = "CosineAnnealingLR"
+    min_lr: float = 1e-6
 
     # Reproducibility
     seed: int = 42
