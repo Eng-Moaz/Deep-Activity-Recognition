@@ -156,7 +156,7 @@ def extract_features(backbone, frames, device):
             feats = backbone(crop_batch).flatten(1)
         all_timesteps.append(feats.cpu())
 
-    return torch.stack(all_timesteps).unsqueeze(0)  # (1, 9, 12, 2048)
+    return torch.stack(all_timesteps).unsqueeze(0).float()  # (1, 9, 12, 2048)
 
 
 def predict_actions(action_model, frame, device):
