@@ -4,7 +4,6 @@ A PyTorch implementation of *"A Hierarchical Deep Temporal Model for Group Activ
 
 This project implements a hierarchy of baselines that progressively build from a simple image classifier to a full two-stage hierarchical model with team-level pooling and temporal LSTMs.
 
-<!-- Replace with a figure from the paper showing the model architecture -->
 ![Model Architecture](architecture.png)
 
 ---
