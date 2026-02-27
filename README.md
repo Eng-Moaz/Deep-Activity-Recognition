@@ -68,24 +68,23 @@ python -m modeling.b8.train
 
 ---
 
-## Demo Inference
+## Demo
 
-Run the model on a single volleyball clip and generate an annotated video with player tracking and activity predictions:
+https://github.com/user-attachments/assets/REPLACE_WITH_YOUR_VIDEO_ID
+
+The demo runs the B8 model on a volleyball clip, overlaying:
+- **Player bounding boxes** with individual action labels (blocking, spiking, etc.)
+- **Group activity prediction** with confidence score, updated on each sliding window
+
+### Run it yourself
 
 ```bash
 python scripts/demo_inference.py \
     --video_id 4 --clip_id 29211 \
     --backbone_ckpt checkpoints/b3/best_model_b3_stg1.pth \
     --model_ckpt checkpoints/b8/best_model_b8.pth \
-    --output demo.mp4
+    --output demo.mp4 --fps 10
 ```
-
-The output video shows each frame with:
-- **Player bounding boxes** with individual action labels (blocking, spiking, etc.)
-- **Group activity prediction** banner with confidence score
-
-<!-- Uncomment and add your demo video/gif here -->
-<!-- ![Demo](demo.gif) -->
 
 ---
 
