@@ -1,4 +1,3 @@
-import torch
 import torch.nn as nn
 
 
@@ -7,22 +6,27 @@ class Baseline7(nn.Module):
     def __init__(self, cfg):
         super().__init__()
 
-        # Pool over players
-        self.pool = nn.AdaptiveMaxPool1d(1)
-
-        # Scene-level LSTM over the temporal sequence
-        self.scene_lstm = nn.LSTM(
+        # Player-level LSTM (learns temporal features from raw CNN)
+        self.lstm1 = nn.LSTM(
             input_size=cfg.input_size,
-            hidden_size=cfg.hidden_size,
+            hidden_size=cfg.hidden_size_player,
             num_layers=1,
             batch_first=True,
         )
 
-        self.lstm_dropout = nn.Dropout(cfg.dropout)
+        # Scene-level LSTM (operates on pooled player representations)
+        self.lstm2 = nn.LSTM(
+            input_size=cfg.hidden_size_player,
+            hidden_size=cfg.hidden_size_scene,
+            num_layers=1,
+            batch_first=True,
+        )
+
+        self.adaptive_max_pool = nn.AdaptiveMaxPool1d(1)
 
         # Classifier
-        self.classifier = nn.Sequential(
-            nn.Linear(cfg.input_size + cfg.hidden_size, 512),
+        self.fc = nn.Sequential(
+            nn.Linear(cfg.hidden_size_scene, 512),
             nn.BatchNorm1d(512),
             nn.ReLU(),
             nn.Dropout(cfg.dropout),
@@ -30,22 +34,23 @@ class Baseline7(nn.Module):
         )
 
     def forward(self, x):
-        # x: (B, seq=9, players=12, feat=input_size)
+        # x: (B, seq=9, players=12, feat=2048)
         batch, seq, players, feat = x.shape
 
-        # Pool over players per frame
-        x = x.view(batch * seq, players, feat)      # (B*9, 12, feat)
-        x = x.permute(0, 2, 1)                      # (B*9, feat, 12)
-        x = self.pool(x).squeeze(-1)                 # (B*9, feat)
-        x = x.view(batch, seq, feat)                 # (B, 9, feat)
+        # LSTM1: per-player temporal modeling
+        x = x.view(batch * players, seq, feat)               # (B*12, 9, 2048)
+        x, _ = self.lstm1(x)                                  # (B*12, 9, hidden_player)
 
-        # Scene LSTM over temporal sequence
-        lstm_out, _ = self.scene_lstm(x)             # (B, 9, hidden)
-        lstm_out = self.lstm_dropout(lstm_out)
+        x = x.view(batch, players, seq, -1)                   # (B, 12, 9, hidden_player)
 
-        # Temporal mean pooling over all timesteps
-        x_mean = x.mean(dim=1)                       # (B, feat)
-        lstm_mean = lstm_out.mean(dim=1)              # (B, hidden)
-        combined = torch.cat([x_mean, lstm_mean], dim=1)  # (B, feat + hidden)
+        # Max pool over players per frame
+        x = x.permute(0, 2, 3, 1).contiguous()               # (B, 9, hidden_player, 12)
+        x = x.view(batch * seq, -1, players)                  # (B*9, hidden_player, 12)
+        x = self.adaptive_max_pool(x).squeeze(-1)             # (B*9, hidden_player)
+        x = x.view(batch, seq, -1)                            # (B, 9, hidden_player)
 
-        return self.classifier(combined)
+        # LSTM2: scene-level temporal modeling
+        x, _ = self.lstm2(x)                                  # (B, 9, hidden_scene)
+        x = x[:, -1, :]                                      # (B, hidden_scene)
+
+        return self.fc(x)

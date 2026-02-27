@@ -12,31 +12,31 @@ class Config:
     device: str = "cuda"
     num_workers: int = 4
 
-    # Data — uses pre-extracted temporal features: (9 frames x 12 players x 3072)
+    # Data — uses pre-extracted CNN features: (9 frames x 12 players x 2048)
     task_type: str = "features"
     input_mode: str = "features"
-    input_size: int = 3072  # 2048 CNN + 1024 LSTM
-    feature_file_stem: str = "temporal_features"
+    input_size: int = 2048  # Raw CNN features (NOT temporal)
+    feature_file_stem: str = "features"
 
     # Feature paths
     features_dir: str = os.environ.get("VOLLEYBALL_FEATURES_DIR", "features")
 
     # Training
-    epochs: int = 35
+    epochs: int = 30
     batch_size: int = 64
-    learning_rate: float = 5e-4
-    weight_decay: float = 0.05
+    learning_rate: float = 1e-4
+    weight_decay: float = 0.01
     optimizer: str = "AdamW"
     use_amp: bool = False
     patience: int = 15
     grad_clip_norm: float = 1.0
-    label_smoothing: float = 0.1
+    label_smoothing: float = 0.0
 
     # Model
     num_classes: int = 8
-    hidden_size_frame: int = 2048
-    hidden_fc: int = 512
-    dropout: float = 0.7
+    hidden_size_player: int = 2048  # LSTM1: player-level
+    hidden_size_scene: int = 2048   # LSTM2: scene-level
+    dropout: float = 0.5
 
     class_names: List[str] = field(default_factory=lambda: [
         'l_pass', 'r_pass',
@@ -46,9 +46,7 @@ class Config:
     ])
 
     # Scheduler
-    use_scheduler: bool = True
-    scheduler_type: str = "CosineAnnealingLR"
-    min_lr: float = 1e-6
+    use_scheduler: bool = False
 
     # Reproducibility
     seed: int = 42

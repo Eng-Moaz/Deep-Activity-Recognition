@@ -20,11 +20,12 @@ def get_feature_loaders(cfg):
     batch_size = cfg.batch_size
     num_workers = cfg.num_workers
 
-    print(f"Loading features from: {features_dir}")
+    stem = cfg.feature_file_stem
+    print(f"Loading features from: {features_dir} (stem={stem})")
 
-    train_ds = FeaturesDataset(os.path.join(features_dir, "train_temporal_features.pt"))
-    val_ds = FeaturesDataset(os.path.join(features_dir, "val_temporal_features.pt"))
-    test_ds = FeaturesDataset(os.path.join(features_dir, "test_temporal_features.pt"))
+    train_ds = FeaturesDataset(os.path.join(features_dir, f"train_{stem}.pt"))
+    val_ds = FeaturesDataset(os.path.join(features_dir, f"val_{stem}.pt"))
+    test_ds = FeaturesDataset(os.path.join(features_dir, f"test_{stem}.pt"))
 
     pin = num_workers > 0
     train_loader = DataLoader(
