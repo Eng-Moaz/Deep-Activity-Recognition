@@ -22,21 +22,20 @@ class Config:
     features_dir: str = os.environ.get("VOLLEYBALL_FEATURES_DIR", "features")
 
     # Training
-    epochs: int = 70
+    epochs: int = 30
     batch_size: int = 64
-    learning_rate: float = 6e-6
+    learning_rate: float = 1e-4
     weight_decay: float = 0.01
     optimizer: str = "AdamW"
     use_amp: bool = False
-    patience: int = 25
+    patience: int = 15
     grad_clip_norm: float = 1.0
     label_smoothing: float = 0.0
 
     # Model
     num_classes: int = 8
-    hidden_size_player: int = 512  # LSTM1: player-level
-    hidden_size_scene: int = 512   # LSTM2: scene-level
-    lstm2_layers: int = 2          # 2-layer scene LSTM (Sh-31 approach)
+    hidden_size_player: int = 2048  # LSTM1: player-level
+    hidden_size_scene: int = 2048   # LSTM2: scene-level
     dropout: float = 0.5
 
     class_names: List[str] = field(default_factory=lambda: [
