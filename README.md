@@ -69,7 +69,7 @@ python -m modeling.b8.train
 
 ## Demo
 
-[DEMO](https://drive.google.com/file/d/1A96RTRV9LJNLhOdsyhk48Ezjy4mUzBfd/view?usp=sharing)
+[Video Demo](https://drive.google.com/file/d/1A96RTRV9LJNLhOdsyhk48Ezjy4mUzBfd/view?usp=sharing)
 
 The demo runs the B8 model on a volleyball clip, overlaying:
 - **Player bounding boxes** with individual action labels (blocking, spiking, etc.)
