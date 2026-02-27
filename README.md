@@ -20,7 +20,7 @@ This project implements a hierarchy of baselines that progressively build from a
 | B7 | Two-stage Model without LSTM 2 | 80.2% | **86.54%** |
 | B8 | Two-stage Hierarchical Model | 81.9% | **88.86%** |
 
-> **Note:** The original paper uses AlexNet as the backbone. Our implementation uses ResNet-50, which provides stronger visual features and contributes to the improved accuracy across all baselines.
+> **Note:** The original paper uses AlexNet as the backbone. My implementation uses ResNet-50, which provides stronger visual features and contributes to the improved accuracy across all baselines.
 
 ---
 
@@ -65,6 +65,27 @@ python -m modeling.b6.train
 python -m modeling.b7.train
 python -m modeling.b8.train
 ```
+
+---
+
+## Demo Inference
+
+Run the model on a single volleyball clip and generate an annotated video with player tracking and activity predictions:
+
+```bash
+python scripts/demo_inference.py \
+    --video_id 4 --clip_id 29211 \
+    --backbone_ckpt checkpoints/b3/best_model_b3_stg1.pth \
+    --model_ckpt checkpoints/b8/best_model_b8.pth \
+    --output demo.mp4
+```
+
+The output video shows each frame with:
+- **Player bounding boxes** with individual action labels (blocking, spiking, etc.)
+- **Group activity prediction** banner with confidence score
+
+<!-- Uncomment and add your demo video/gif here -->
+<!-- ![Demo](demo.gif) -->
 
 ---
 
