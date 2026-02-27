@@ -1,2 +1,11 @@
-.idea
+__pycache__/
+*.pyc
 *.pth
+*.pt
+.idea/
+.vscode/
+.pytest_cache/
+runs/
+features/
+checkpoints/
+*.egg-info/
