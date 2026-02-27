@@ -70,11 +70,11 @@ class Config_stg2:
     device: str = "cuda"
     num_workers: int = 4
 
-    # Data — uses pre-extracted player features: (9, 12, feat_dim)
+    # Data — uses temporal features from B5 Stage 1: (9, 12, 3072)
+    # 3072 = 2048 CNN + 1024 LSTM (concatenated per paper Eq. 7)
     task_type: str = "features"
     input_mode: str = "features"
-    input_size: int = 3072  # 2048 CNN + 1024 LSTM
-    # For diagnostic (stage-2 <75% with temporal): set input_size=2048, feature_file_stem="temporal_cnn_only"
+    input_size: int = 3072
     feature_file_stem: str = "temporal_features"
 
     # Feature paths
@@ -83,19 +83,17 @@ class Config_stg2:
     # Training
     epochs: int = 30
     batch_size: int = 64
-    learning_rate: float = 5e-4
-    weight_decay: float = 0.05
+    learning_rate: float = 1e-4
+    weight_decay: float = 0.01
     optimizer: str = "AdamW"
     use_amp: bool = False
     patience: int = 10
     grad_clip_norm: float = 1.0
-    label_smoothing: float = 0.1
+    label_smoothing: float = 0.0
 
-    # Model
+    # Model — simple pool + FC (no LSTM, no scene temporal modeling)
     num_classes: int = 8
-    hidden_size: int = 1024
-    lstm_layers: int = 1
-    dropout: float = 0.7
+    dropout: float = 0.5
 
     class_names: List[str] = field(default_factory=lambda: [
         'l_pass', 'r_pass',
@@ -105,9 +103,7 @@ class Config_stg2:
     ])
 
     # Scheduler
-    use_scheduler: bool = True
-    scheduler_type: str = "CosineAnnealingLR"
-    min_lr: float = 1e-6
+    use_scheduler: bool = False
 
     # Reproducibility
     seed: int = 42
@@ -115,3 +111,4 @@ class Config_stg2:
     # Paths
     model_save_path: str = "checkpoints/b5/best_model_b5_stg2.pth"
     cm_save_path: str = "checkpoints/b5/confusion_matrix_b5_stg2.png"
+
