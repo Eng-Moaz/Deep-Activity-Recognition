@@ -10,7 +10,7 @@ This project implements a hierarchy of baselines that progressively build from a
 
 ## Results
 
-| Baseline | Method | Paper (AlexNet) | Ours (ResNet-50) |
+| Baseline | Method | Paper (AlexNet) | My Implementation (ResNet-50) |
 |----------|--------|:---------------:|:----------------:|
 | B1 | Image Classification | 66.7% | **73.73%** |
 | B3 | Fine-tuned Person Classification | 68.1% | **81.60%** |
